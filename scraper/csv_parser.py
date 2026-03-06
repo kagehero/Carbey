@@ -111,6 +111,9 @@ class CMatchCSVParser:
             vehicle["mileage_numeric"] = self._extract_numeric_mileage(vehicle.get("mileage"))
             vehicle["days_listed_numeric"] = self._extract_numeric(vehicle.get("days_listed"))
             
+            # Calculate published_date from days_listed
+            vehicle["published_date"] = self._calculate_published_date(vehicle.get("days_listed"))
+            
             vehicles.append(vehicle)
         
         return vehicles
@@ -201,6 +204,23 @@ class CMatchCSVParser:
         except:
             pass
         
+        return None
+    
+    def _calculate_published_date(self, days_listed_str: str) -> str:
+        """
+        Calculate published_date from days_listed (総掲載日数)
+        If a vehicle has been listed for X days, published_date = today - X days
+        """
+        from datetime import timedelta
+        
+        days_listed = self._extract_numeric(days_listed_str)
+        
+        if days_listed and days_listed > 0:
+            # Calculate published date
+            published_date = datetime.now() - timedelta(days=days_listed)
+            return published_date.strftime('%Y-%m-%d')
+        
+        # If no days_listed, return None
         return None
     
     def save_to_json(self, vehicles: List[Dict], output_path: str = None):

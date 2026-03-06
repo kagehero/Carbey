@@ -30,6 +30,16 @@ def sync_to_supabase(vehicles: List[Dict]):
     if not filtered:
         print("[INFO] No valid rows with upsert key found; nothing to send to Supabase.")
         return
+    
+    # Clean data for Supabase
+    for vehicle in filtered:
+        # Convert empty strings to None for date fields
+        if vehicle.get('published_date') == '':
+            vehicle['published_date'] = None
+        # Remove 'index' and 'scraped_at' fields (not compatible with schema or already set)
+        for field in ['index']:
+            if field in vehicle:
+                del vehicle[field]
 
     table = Config.SUPABASE_TABLE
     conflict_col = Config.SUPABASE_CONFLICT_COLUMN

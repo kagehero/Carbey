@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Inventory } from '@/types'
-import { formatPrice, formatMileage, calculateStagnationDays, getStagnationColor } from '@/lib/utils'
-import { Edit, Eye, Trash2, Search } from 'lucide-react'
+import { formatPrice, formatMileage, calculateStagnationDays, getStagnationColor, getNoStagnationReason } from '@/lib/utils'
+import { Edit, Eye, Trash2, Search, AlertCircle } from 'lucide-react'
 
 interface InventoryTableProps {
   inventories: Inventory[]
@@ -93,6 +93,12 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
               const stagnation = inventory.published_date 
                 ? calculateStagnationDays(inventory.published_date)
                 : null
+              
+              const noStagnationReason = getNoStagnationReason(
+                inventory.published_date,
+                inventory.publication_status,
+                inventory.status
+              )
 
               return (
                 <tr key={inventory.id} className="hover:bg-gray-50">
@@ -134,7 +140,17 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
                         {stagnation}日
                       </span>
                     ) : (
-                      <span className="text-sm text-gray-400">-</span>
+                      <div className="flex items-center gap-1 group relative">
+                        <span className="text-sm text-gray-400">-</span>
+                        <AlertCircle className="w-4 h-4 text-gray-400 cursor-help" />
+                        
+                        {/* Tooltip */}
+                        <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-10 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                          <div className="font-semibold mb-1">滞留日数が表示されない理由：</div>
+                          <div>{noStagnationReason}</div>
+                          <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                        </div>
+                      </div>
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
