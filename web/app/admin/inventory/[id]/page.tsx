@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { formatPrice, formatMileage, calculateStagnationDays, calculateCVR, getStagnationColor, getCVRColor } from '@/lib/utils'
-import { Calendar, Eye, Mail, Phone, MapPin, Gauge, Palette, Car } from 'lucide-react'
+import { formatPrice, formatMileage, calculateStagnationDays, calculateCVR, getStagnationColor, getCVRColor, getNoStagnationReason } from '@/lib/utils'
+import { Calendar, Eye, Mail, Phone, MapPin, Gauge, Palette, Car, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
 async function getVehicle(id: string) {
@@ -29,6 +29,12 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
   if (!vehicle) {
     notFound()
   }
+  
+  const noStagnationReason = getNoStagnationReason(
+    vehicle.published_date,
+    vehicle.publication_status,
+    vehicle.status
+  )
 
   const infoSections = [
     {
@@ -78,7 +84,12 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
       items: [
         { label: 'ステータス', value: vehicle.status },
         { label: '掲載開始日', value: vehicle.published_date ? new Date(vehicle.published_date).toLocaleDateString('ja-JP') : '-' },
-        { label: '滞留日数', value: `${vehicle.stagnation_days}日`, valueColor: getStagnationColor(vehicle.stagnation_days) },
+        { 
+          label: '滞留日数', 
+          value: vehicle.stagnation_days > 0 ? `${vehicle.stagnation_days}日` : '-',
+          valueColor: vehicle.stagnation_days > 0 ? getStagnationColor(vehicle.stagnation_days) : 'text-gray-400',
+          tooltip: vehicle.stagnation_days === 0 ? noStagnationReason : undefined
+        },
         { label: '閲覧数', value: vehicle.detail_views || 0 },
         { label: 'メール問合せ', value: vehicle.email_inquiries || 0 },
         { label: '電話問合せ', value: vehicle.phone_inquiries || 0 },
@@ -130,9 +141,19 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
           <div className="flex items-center gap-3 mb-2">
             <Calendar className="w-5 h-5 text-gray-400" />
             <div className="text-sm text-gray-500">滞留日数</div>
+            {vehicle.stagnation_days === 0 && noStagnationReason && (
+              <div className="group relative inline-block ml-auto">
+                <AlertCircle className="w-4 h-4 text-gray-400 cursor-help" />
+                <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-10 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg">
+                  <div className="font-semibold mb-1">表示されない理由：</div>
+                  <div>{noStagnationReason}</div>
+                  <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className={`text-3xl font-bold ${getStagnationColor(vehicle.stagnation_days)}`}>
-            {vehicle.stagnation_days}日
+          <div className={`text-3xl font-bold ${vehicle.stagnation_days > 0 ? getStagnationColor(vehicle.stagnation_days) : 'text-gray-400'}`}>
+            {vehicle.stagnation_days > 0 ? `${vehicle.stagnation_days}日` : '-'}
           </div>
         </div>
 
@@ -184,8 +205,18 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
                   {section.items.map((item) => (
                     <div key={item.label} className="flex justify-between">
                       <dt className="text-sm text-gray-500">{item.label}</dt>
-                      <dd className={`text-sm font-medium ${item.valueColor || 'text-gray-900'}`}>
+                      <dd className={`text-sm font-medium ${item.valueColor || 'text-gray-900'} flex items-center gap-1`}>
                         {item.value || '-'}
+                        {item.tooltip && (
+                          <div className="group relative inline-block">
+                            <AlertCircle className="w-4 h-4 text-gray-400 cursor-help" />
+                            <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-10 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-lg font-normal">
+                              <div className="font-semibold mb-1">理由：</div>
+                              <div>{item.tooltip}</div>
+                              <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                            </div>
+                          </div>
+                        )}
                       </dd>
                     </div>
                   ))}

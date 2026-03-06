@@ -84,3 +84,21 @@ export function getCVRColor(cvr: number): string {
   if (cvr >= 2) return 'text-blue-600'
   return 'text-red-600'
 }
+
+export function getNoStagnationReason(
+  publishedDate: string | Date | null,
+  publicationStatus?: string | null,
+  status?: string | null
+): string {
+  if (publishedDate) return ''
+  
+  if (publicationStatus === '非掲載') {
+    return '未掲載（まだカーセンサーに掲載されていません）'
+  } else if (status === '売約済') {
+    return '売約済（販売完了のため掲載終了）'
+  } else if (status === '非公開') {
+    return '非公開（掲載を一時停止中）'
+  } else {
+    return '掲載開始日未設定'
+  }
+}
