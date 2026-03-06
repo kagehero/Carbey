@@ -1,0 +1,694 @@
+================================================================================
+CARBEY - INVENTORY MANAGEMENT & SALES OPTIMIZATION SYSTEM
+PRODUCTION ARCHITECTURE (Senior Developer Design)
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+Full-stack system for used car dealership with:
+- Internal management dashboard (admin/viewer roles)
+- Public website (corporate + sales LP + inventory listing)
+- Automated C-MATCH sync pipeline
+- Analytics engine (CVR, stagnation, pricing optimization)
+- SEO-optimized pages
+
+TECH STACK (Confirmed from Requirements)
+================================================================================
+Frontend:     Next.js 14+ (App Router)
+Backend:      Supabase (PostgreSQL + Auth + Edge Functions)
+Database:     PostgreSQL (via Supabase)
+Sync:         Python (existing scraper pipeline)
+Deployment:   Vercel (frontend) + Supabase Cloud
+Auth:         Supabase Auth (email/password + RBAC)
+
+PROJECT STRUCTURE
+================================================================================
+
+carbey/
+├── scraper/                          # Python data pipeline (EXISTING)
+│   ├── __init__.py
+│   ├── csv_downloader.py            # C-MATCH login & CSV download
+│   ├── csv_parser.py                # CSV → JSON + Supabase upsert
+│   └── analytics_calculator.py      # NEW: Calculate metrics after sync
+│
+├── web/                              # Next.js frontend (NEW)
+│   ├── app/                          # App Router
+│   │   ├── (public)/                # Public site routes
+│   │   │   ├── page.tsx             # TOP page (brand building)
+│   │   │   ├── lp/
+│   │   │   │   └── page.tsx         # Sales-focused LP
+│   │   │   ├── inventory/
+│   │   │   │   ├── page.tsx         # Inventory list (public)
+│   │   │   │   └── [id]/
+│   │   │   │       └── page.tsx     # Vehicle detail page
+│   │   │   ├── about/
+│   │   │   │   └── page.tsx         # Company info
+│   │   │   └── contact/
+│   │   │       └── page.tsx         # Contact form
+│   │   │
+│   │   ├── (admin)/                 # Admin dashboard (protected)
+│   │   │   ├── layout.tsx           # Auth wrapper
+│   │   │   ├── dashboard/
+│   │   │   │   └── page.tsx         # Main dashboard
+│   │   │   ├── inventory/
+│   │   │   │   ├── page.tsx         # Inventory management
+│   │   │   │   ├── [id]/
+│   │   │   │   │   └── page.tsx     # Edit vehicle
+│   │   │   │   └── new/
+│   │   │   │       └── page.tsx     # Add vehicle
+│   │   │   ├── analytics/
+│   │   │   │   ├── page.tsx         # Analytics overview
+│   │   │   │   ├── stagnation/
+│   │   │   │   │   └── page.tsx     # Stagnation analysis
+│   │   │   │   ├── pricing/
+│   │   │   │   │   └── page.tsx     # Price optimization
+│   │   │   │   └── cvr/
+│   │   │   │       └── page.tsx     # CVR analysis
+│   │   │   └── settings/
+│   │   │       └── page.tsx         # User/role management
+│   │   │
+│   │   ├── api/                     # API routes (if needed)
+│   │   │   └── webhooks/
+│   │   │       └── sync/
+│   │   │           └── route.ts     # Trigger Python sync
+│   │   │
+│   │   └── layout.tsx               # Root layout
+│   │
+│   ├── components/                  # Reusable components
+│   │   ├── ui/                      # shadcn/ui components
+│   │   ├── inventory/
+│   │   │   ├── InventoryCard.tsx
+│   │   │   ├── InventoryFilters.tsx
+│   │   │   └── InventoryTable.tsx
+│   │   ├── analytics/
+│   │   │   ├── StagnationChart.tsx
+│   │   │   ├── CVRChart.tsx
+│   │   │   └── PriorityScoreTable.tsx
+│   │   ├── layout/
+│   │   │   ├── Header.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   └── AdminSidebar.tsx
+│   │   └── forms/
+│   │       ├── VehicleForm.tsx
+│   │       └── ContactForm.tsx
+│   │
+│   ├── lib/                         # Utilities
+│   │   ├── supabase/
+│   │   │   ├── client.ts            # Browser client
+│   │   │   ├── server.ts            # Server client
+│   │   │   └── middleware.ts        # Auth middleware
+│   │   ├── analytics/
+│   │   │   ├── cvr.ts               # CVR calculations
+│   │   │   ├── stagnation.ts        # Stagnation logic
+│   │   │   └── scoring.ts           # Priority scoring
+│   │   └── utils.ts                 # General utilities
+│   │
+│   ├── types/
+│   │   ├── database.ts              # Supabase generated types
+│   │   └── index.ts                 # Custom types
+│   │
+│   ├── public/                      # Static assets
+│   │   ├── images/
+│   │   └── fonts/
+│   │
+│   ├── .env.local                   # Next.js env vars
+│   ├── next.config.js
+│   ├── tailwind.config.ts
+│   ├── tsconfig.json
+│   └── package.json
+│
+├── supabase/                        # Supabase config (NEW)
+│   ├── migrations/
+│   │   ├── 001_initial_schema.sql   # Tables setup
+│   │   ├── 002_rls_policies.sql     # Row Level Security
+│   │   ├── 003_functions.sql        # Database functions
+│   │   └── 004_triggers.sql         # Auto-update triggers
+│   │
+│   ├── functions/                   # Edge Functions
+│   │   ├── calculate-metrics/
+│   │   │   └── index.ts             # Auto-calculate analytics
+│   │   └── sync-webhook/
+│   │       └── index.ts             # Webhook for Python sync
+│   │
+│   └── config.toml
+│
+├── data/                            # Python scraper output (EXISTING)
+│   ├── csv/
+│   ├── parsed/
+│   └── logs/
+│
+├── config.py                        # Python config (EXISTING)
+├── carbey.py                        # Python CLI (EXISTING)
+├── requirements.txt                 # Python deps (EXISTING)
+├── .env                             # Python + Supabase creds
+└── .gitignore
+
+
+DATABASE SCHEMA (Supabase PostgreSQL)
+================================================================================
+
+TABLE: inventories (PRIMARY)
+--------------------------------------------------------------------------------
+id                      uuid PRIMARY KEY DEFAULT gen_random_uuid()
+vehicle_code            text UNIQUE NOT NULL              -- C-MATCH ID
+management_number       text
+vin                     text
+
+-- Basic info
+maker                   text
+car_name                text
+grade                   text
+grade_notes             text
+year                    numeric
+year_month              numeric
+color                   text
+inspection              text
+
+-- Pricing
+price_body              numeric                          -- Current body price
+price_total             numeric                          -- Current total price
+price_initial           numeric                          -- Initial price (for history)
+price_body_display      text
+price_total_display     text
+
+-- Mileage
+mileage                 numeric
+mileage_display         text
+mileage_numeric         numeric
+
+-- Status
+status                  text                             -- 販売中/売約済/非公開
+publication_status      text
+stock_status            text
+unpublished_reason      text
+
+-- Dates
+stock_date              date                             -- 入庫日
+published_date          date                             -- 掲載開始日
+scraped_at              timestamptz
+inserted_at             timestamptz DEFAULT now()
+updated_at              timestamptz DEFAULT now()
+
+-- C-MATCH specific
+days_listed             numeric
+days_listed_numeric     numeric
+plan_count              numeric
+plan_a                  text
+plan_b                  text
+image_count             numeric
+caption_count           numeric
+comment1                text
+comment2                text
+expanded_frame          text
+other_media_status      text
+
+-- Ratings
+certification_status    text
+rating_overall          text
+rating_interior         text
+rating_exterior         text
+evaluation_expiry       text
+evaluation_published    text
+registered_date         text
+updated_date            text
+
+-- Reuse
+reused_vehicle          text
+reused_days_remaining   numeric
+price_review            text
+inspection_request      text
+
+-- Analytics (denormalized for performance)
+detail_views            numeric
+email_inquiries         numeric
+phone_inquiries         numeric
+map_views               numeric
+favorites               numeric
+
+INDEXES:
+  - vehicle_code (unique, for upsert)
+  - maker, car_name (filtering)
+  - status, publication_status (filtering)
+  - published_date (stagnation calc)
+  - price_body (sorting)
+
+
+TABLE: inventory_metrics (ANALYTICS)
+--------------------------------------------------------------------------------
+id                      uuid PRIMARY KEY DEFAULT gen_random_uuid()
+inventory_id            uuid REFERENCES inventories(id) ON DELETE CASCADE
+calculated_at           timestamptz DEFAULT now()
+
+-- Calculated metrics
+stagnation_days         integer                          -- 現在日 - published_date
+cvr                     numeric(5,2)                     -- (inquiries / views) * 100
+rotation_score          numeric(10,2)                    -- Priority score
+discount_flag           boolean                          -- 値下げ検討フラグ
+
+-- Scoring factors
+views_count             integer                          -- From inventories.detail_views
+inquiry_count           integer                          -- From inventories.email_inquiries
+price_change_count      integer                          -- From price_histories
+days_since_price_change integer
+
+updated_at              timestamptz DEFAULT now()
+
+UNIQUE (inventory_id)  -- One metric row per vehicle
+
+
+TABLE: price_histories (PRICE TRACKING)
+--------------------------------------------------------------------------------
+id                      uuid PRIMARY KEY DEFAULT gen_random_uuid()
+inventory_id            uuid REFERENCES inventories(id) ON DELETE CASCADE
+old_price               numeric NOT NULL
+new_price               numeric NOT NULL
+price_diff              numeric                          -- new - old
+price_diff_pct          numeric(5,2)                     -- (diff / old) * 100
+changed_by              uuid REFERENCES auth.users(id)   -- Who changed it
+changed_at              timestamptz DEFAULT now()
+
+INDEX: inventory_id, changed_at DESC
+
+
+TABLE: users (via Supabase Auth)
+--------------------------------------------------------------------------------
+Uses auth.users table (built-in)
+Extended with:
+
+TABLE: user_profiles
+--------------------------------------------------------------------------------
+id                      uuid PRIMARY KEY REFERENCES auth.users(id)
+role                    text NOT NULL DEFAULT 'viewer'   -- admin / viewer
+name                    text
+created_at              timestamptz DEFAULT now()
+updated_at              timestamptz DEFAULT now()
+
+
+ROW LEVEL SECURITY (RLS) POLICIES
+================================================================================
+
+inventories:
+  - SELECT: Public for status='販売中', Authenticated for all
+  - INSERT/UPDATE/DELETE: Only role='admin'
+
+inventory_metrics:
+  - SELECT: Authenticated users
+  - INSERT/UPDATE: Service role only (auto-calculated)
+
+price_histories:
+  - SELECT: Authenticated users
+  - INSERT: Only role='admin' (via trigger on price update)
+
+user_profiles:
+  - SELECT: Own profile + admins can see all
+  - UPDATE: Own profile only
+
+
+ANALYTICS CALCULATION LOGIC
+================================================================================
+
+1. STAGNATION DAYS
+------------------
+stagnation_days = CURRENT_DATE - published_date
+
+Bands:
+  - 0-30 days:   Normal
+  - 31-45 days:  Watch
+  - 46-60 days:  Attention
+  - 61-180 days: Critical
+  - 180+ days:   Urgent
+
+2. CVR (Conversion Rate)
+------------------------
+cvr = (email_inquiries / detail_views) * 100
+
+Thresholds:
+  - CVR >= 5%:   Excellent
+  - CVR 2-5%:    Good
+  - CVR < 2%:    Poor (discount flag)
+
+3. DISCOUNT FLAG
+----------------
+Triggered if ANY of:
+  - stagnation_days >= 60
+  - cvr < 2.0
+
+4. ROTATION PRIORITY SCORE
+---------------------------
+Base formula:
+  score = (stagnation_weight * stagnation_days) 
+        + (cvr_weight * (5 - cvr))              -- Inverse: lower CVR = higher score
+        + (price_change_weight * price_change_count)
+
+Weights (configurable):
+  - stagnation_weight: 1.0
+  - cvr_weight: 10.0
+  - price_change_weight: 5.0
+
+Higher score = higher priority to sell
+
+
+AUTOMATION WORKFLOWS
+================================================================================
+
+DAILY SYNC (Python → Supabase)
+-------------------------------
+1. Cron job triggers: python carbey.py sync
+2. Downloads C-MATCH CSV
+3. Parses and upserts to inventories table
+4. Triggers Edge Function: calculate-metrics
+5. Edge Function updates inventory_metrics for all vehicles
+6. Logs sync result
+
+METRIC CALCULATION (Supabase Edge Function)
+--------------------------------------------
+Triggered by:
+  - After inventory sync
+  - Manual refresh from admin dashboard
+  - Scheduled (daily at midnight)
+
+Process:
+  1. For each vehicle in inventories:
+     - Calculate stagnation_days
+     - Calculate cvr (if views > 0)
+     - Calculate rotation_score
+     - Set discount_flag
+  2. Upsert to inventory_metrics
+
+PRICE CHANGE TRACKING (Database Trigger)
+-----------------------------------------
+ON UPDATE inventories.price_body:
+  IF old.price_body != new.price_body THEN
+    INSERT INTO price_histories (
+      inventory_id, old_price, new_price, 
+      price_diff, price_diff_pct, changed_by
+    )
+
+
+PAGE SPECIFICATIONS
+================================================================================
+
+PUBLIC PAGES
+------------
+
+1. TOP PAGE (/)
+   Purpose: Brand building, trust, SEO
+   Sections:
+     - Hero: "神奈川最大級の在庫数" + CTA
+     - Stats: 在庫数, 販売実績, 顧客満足度
+     - Strengths: 自社ローン, 遠方購入対応, 保証
+     - Process: 仕入れ→整備→販売フロー
+     - Reviews: 口コミ表示
+     - Inventory preview: Top 6 vehicles
+     - CTA: LINE相談 + 在庫一覧
+   SEO: 厚木市 中古車, 神奈川 自社ローン
+
+2. SALES LP (/lp)
+   Purpose: Maximize inquiries (CVR 5%+)
+   Target: ローン不安層, 遠方購入層, 低予算層, ファミリー層
+   Sections:
+     - Hero: "月々1万円から" + 即LINE相談
+     - Loan simulator: 月額シミュレーター
+     - Benefits: 自社ローン強み, 審査通過率
+     - Remote purchase: 遠方購入の流れ
+     - FAQ: ローン, 遠方購入, 保証
+     - CTA (multiple): LINE相談, ローン審査申込
+   Features:
+     - Fixed LINE button (bottom)
+     - Mobile-first design
+     - Fast load (<2s)
+
+3. INVENTORY LIST (/inventory)
+   Purpose: Browse all vehicles
+   Features:
+     - Filters: 価格帯, メーカー, 車種, 年式, 走行距離
+     - Sort: 価格, 年式, 走行距離, 掲載日
+     - Tags: 回転重視, 値下げ検討, 新着
+     - Display modes: Grid / List
+     - Pagination: 20 per page
+     - SEO: Dynamic meta per filter
+   Data: From inventories WHERE status='販売中'
+
+4. VEHICLE DETAIL (/inventory/[id])
+   Purpose: Convert to inquiry
+   Sections:
+     - Image gallery (Lightbox)
+     - Specs table
+     - Price: 本体価格 + 支払総額 + 月額表示
+     - CTA: LINE相談, ローン審査, メール問合せ
+     - Similar vehicles
+   SEO: [Maker] [Car_name] [Year] 中古車 厚木
+
+5. ABOUT (/about)
+   Company info, location, business hours
+
+6. CONTACT (/contact)
+   Contact form (name, email, phone, message)
+
+
+ADMIN PAGES (Protected)
+------------------------
+
+1. DASHBOARD (/admin/dashboard)
+   Purpose: Quick overview
+   Widgets:
+     - KPIs: 在庫総数, 販売中, 売約済, 平均滞留日数
+     - Charts: 滞留日数分布, CVR分布
+     - Tables: 
+       * 優先販売ランキング (top 10 by rotation_score)
+       * 値下げ検討対象 (discount_flag=true)
+       * 最近の売約 (last 7 days)
+   Actions: Sync now, Recalculate metrics
+
+2. INVENTORY MANAGEMENT (/admin/inventory)
+   Purpose: CRUD vehicles
+   Features:
+     - Table view with filters
+     - Inline edit (status, price)
+     - Bulk actions (publish, unpublish, delete)
+     - Add new vehicle (manual)
+     - Import from CSV
+   Columns: 車種, 価格, ステータス, 滞留日数, CVR, 操作
+
+3. VEHICLE EDIT (/admin/inventory/[id])
+   Purpose: Edit single vehicle
+   Form fields: All from inventories table
+   Actions: Save, Delete, View public page
+   Side panel: 
+     - Price history chart
+     - Metrics (stagnation, CVR, score)
+     - Activity log
+
+4. ANALYTICS OVERVIEW (/admin/analytics)
+   Purpose: High-level insights
+   Sections:
+     - Stagnation analysis
+     - CVR analysis
+     - Price optimization suggestions
+     - Inventory turnover rate
+   Filters: Date range, maker, price range
+
+5. STAGNATION ANALYSIS (/admin/analytics/stagnation)
+   Purpose: Identify slow-moving inventory
+   Features:
+     - Band breakdown (30/45/60/180 days)
+     - List per band with actions
+     - Trend chart (last 90 days)
+     - Export to CSV
+
+6. PRICING ANALYSIS (/admin/analytics/pricing)
+   Purpose: Optimize pricing
+   Features:
+     - Price vs. CVR scatter plot
+     - Discount candidates list
+     - Price history per vehicle
+     - Suggested price changes
+
+7. CVR ANALYSIS (/admin/analytics/cvr)
+   Purpose: Understand engagement
+   Features:
+     - CVR distribution chart
+     - Top/bottom performers
+     - Views vs. inquiries correlation
+     - Recommendations
+
+8. SETTINGS (/admin/settings)
+   Purpose: User/role management
+   Features:
+     - User list (name, email, role)
+     - Add/edit/delete users
+     - Change own password
+   (Admin only)
+
+
+DEPLOYMENT STRATEGY
+================================================================================
+
+ENVIRONMENT SETUP
+-----------------
+Development:
+  - Local Next.js dev server (npm run dev)
+  - Supabase local (supabase start)
+  - Python scraper uses .env.local
+
+Staging:
+  - Vercel preview deployment
+  - Supabase staging project
+  - Python scraper runs on staging schedule
+
+Production:
+  - Vercel production (auto-deploy from main branch)
+  - Supabase production project
+  - Python scraper on cron (daily 6am JST)
+
+CI/CD PIPELINE
+--------------
+1. Git push to main
+2. Vercel auto-deploys frontend
+3. Supabase migrations applied via CLI
+4. Python scraper deployed to cloud function (AWS Lambda / GCP Cloud Run)
+5. Cron job configured for daily sync
+
+MONITORING
+----------
+- Vercel Analytics (page views, performance)
+- Supabase logs (query performance, auth)
+- Python scraper logs (sync success/failure)
+- Sentry (error tracking)
+
+
+SECURITY CONSIDERATIONS
+================================================================================
+
+1. Authentication
+   - Supabase Auth (email/password)
+   - Session-based (httpOnly cookies)
+   - MFA optional (future)
+
+2. Authorization
+   - RLS policies enforce role-based access
+   - Admin: Full CRUD
+   - Viewer: Read-only analytics
+   - Public: Only published vehicles
+
+3. Data Protection
+   - SSL/TLS everywhere
+   - Environment variables for secrets
+   - No sensitive data in frontend code
+   - SQL injection prevention (parameterized queries)
+
+4. Rate Limiting
+   - Supabase built-in rate limits
+   - Vercel Edge Config for custom limits
+   - Python scraper: exponential backoff on C-MATCH
+
+5. Audit Logging
+   - Price changes logged to price_histories
+   - User actions logged (future: audit_logs table)
+
+
+PERFORMANCE OPTIMIZATION
+================================================================================
+
+1. Frontend
+   - Next.js App Router (React Server Components)
+   - Image optimization (next/image)
+   - Code splitting (dynamic imports)
+   - CDN caching (Vercel Edge Network)
+   - Lazy loading (inventory list)
+
+2. Database
+   - Indexes on frequently queried columns
+   - Materialized views for analytics (future)
+   - Connection pooling (Supabase Pooler)
+   - Query optimization (EXPLAIN ANALYZE)
+
+3. API
+   - Server-side data fetching (RSC)
+   - Incremental Static Regeneration (ISR) for public pages
+   - Edge Functions for calculations
+   - Caching strategies (stale-while-revalidate)
+
+4. Python Scraper
+   - Batch upserts (100 records at a time)
+   - Parallel processing (future)
+   - Delta sync (only changed records, future)
+
+
+FUTURE ENHANCEMENTS (Phase 2+)
+================================================================================
+
+1. AI Price Optimization
+   - ML model for optimal pricing
+   - Historical data analysis
+   - Market trend integration
+
+2. Advanced CRM
+   - Customer inquiry tracking
+   - Sales pipeline management
+   - Email/LINE integration
+
+3. Mobile App
+   - React Native (reuse Next.js components)
+   - Push notifications
+   - Offline mode
+
+4. Multi-location Support
+   - Multiple dealership branches
+   - Inventory transfer tracking
+   - Branch-specific analytics
+
+5. Advanced SEO
+   - Dynamic sitemap generation
+   - Schema.org structured data
+   - Blog/content marketing pages
+
+
+DEVELOPMENT PHASES
+================================================================================
+
+Phase 1: Core Infrastructure (Current)
+  ✓ Python scraper pipeline
+  ✓ Supabase schema
+  ✓ Basic sync working
+  → Next: Frontend setup
+
+Phase 2: Admin Dashboard (Next 2 weeks)
+  - Auth setup
+  - Dashboard page
+  - Inventory management
+  - Basic analytics
+
+Phase 3: Public Website (Next 2 weeks)
+  - TOP page
+  - Sales LP
+  - Inventory list/detail
+  - Contact form
+
+Phase 4: Advanced Analytics (Next 1 week)
+  - Stagnation analysis
+  - CVR analysis
+  - Pricing optimization
+  - Automated calculations
+
+Phase 5: Polish & Launch (Next 1 week)
+  - SEO optimization
+  - Performance tuning
+  - User testing
+  - Production deployment
+
+
+NEXT IMMEDIATE STEPS
+================================================================================
+
+1. Complete Supabase schema migration
+2. Set up Next.js project structure
+3. Implement authentication flow
+4. Build admin dashboard skeleton
+5. Connect frontend to Supabase
+6. Test end-to-end sync workflow
+7. Deploy to staging
+
+================================================================================
+END OF ARCHITECTURE DOCUMENT
+================================================================================

@@ -1,0 +1,425 @@
+================================================================================
+PHASE 2: ADMIN DASHBOARD - SETUP GUIDE
+================================================================================
+
+OVERVIEW
+--------
+Phase 2 delivers a fully functional admin dashboard with:
+- Authentication (login/logout)
+- Dashboard with KPIs and analytics
+- Inventory management (CRUD operations)
+- Real-time data from Supabase
+- Role-based access control (admin/viewer)
+
+COMPLETED COMPONENTS
+--------------------
+✓ Next.js 14 project structure
+✓ TypeScript configuration
+✓ Tailwind CSS styling
+✓ Supabase client/server setup
+✓ Database schema (3 migrations)
+✓ Row Level Security policies
+✓ Admin layout with sidebar & header
+✓ Dashboard page with charts
+✓ Inventory management page
+✓ Login page
+✓ Analytics components
+
+PROJECT STRUCTURE
+-----------------
+web/
+├── app/
+│   ├── (admin)/              # Protected admin routes
+│   │   ├── layout.tsx        # Admin layout with auth check
+│   │   ├── dashboard/
+│   │   │   └── page.tsx      # Main dashboard
+│   │   └── inventory/
+│   │       └── page.tsx      # Inventory management
+│   ├── login/
+│   │   └── page.tsx          # Login page
+│   ├── layout.tsx            # Root layout
+│   └── globals.css           # Global styles
+│
+├── components/
+│   ├── layout/
+│   │   ├── AdminSidebar.tsx  # Navigation sidebar
+│   │   └── AdminHeader.tsx   # Top header with user info
+│   ├── analytics/
+│   │   ├── StagnationChart.tsx
+│   │   ├── PriorityTable.tsx
+│   │   └── DiscountCandidates.tsx
+│   └── inventory/
+│       └── InventoryTable.tsx
+│
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts         # Browser client
+│   │   ├── server.ts         # Server client
+│   │   └── middleware.ts     # Auth middleware
+│   └── utils.ts              # Utility functions
+│
+├── types/
+│   ├── database.ts           # Supabase types
+│   └── index.ts              # Custom types
+│
+└── middleware.ts             # Next.js middleware
+
+supabase/
+└── migrations/
+    ├── 001_initial_schema.sql    # Tables creation
+    ├── 002_rls_policies.sql      # Security policies
+    └── 003_functions.sql         # Database functions
+
+
+SETUP STEPS
+================================================================================
+
+STEP 1: SUPABASE PROJECT SETUP
+-------------------------------
+1. Go to https://supabase.com and create a new project
+2. Wait for the project to be provisioned (~2 minutes)
+3. Note down your project credentials:
+   - Project URL: https://xxxxx.supabase.co
+   - Anon/Public Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   - Service Role Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (keep secret!)
+
+
+STEP 2: RUN DATABASE MIGRATIONS
+--------------------------------
+Option A: Using Supabase Dashboard (Recommended for now)
+1. Go to your Supabase project dashboard
+2. Click "SQL Editor" in the left sidebar
+3. Click "New query"
+4. Copy and paste the contents of:
+   - D:\Project\Carbey\supabase\migrations\001_initial_schema.sql
+5. Click "Run" (bottom right)
+6. Repeat for 002_rls_policies.sql and 003_functions.sql
+
+Option B: Using Supabase CLI (Advanced)
+1. Install Supabase CLI: npm install -g supabase
+2. Login: supabase login
+3. Link project: supabase link --project-ref your-project-ref
+4. Run migrations: supabase db push
+
+
+STEP 3: CREATE ADMIN USER
+--------------------------
+1. In Supabase Dashboard, go to "Authentication" → "Users"
+2. Click "Add user" → "Create new user"
+3. Enter:
+   - Email: your@email.com
+   - Password: your_secure_password
+   - Confirm password
+4. Click "Create user"
+
+5. Update user role to admin:
+   - Go to "SQL Editor"
+   - Run this query (replace with your user's email):
+
+```sql
+update public.user_profiles
+set role = 'admin'
+where id = (
+  select id from auth.users
+  where email = 'your@email.com'
+);
+```
+
+
+STEP 4: CONFIGURE ENVIRONMENT VARIABLES
+----------------------------------------
+1. In D:\Project\Carbey\web, create .env.local file:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+```
+
+2. Update D:\Project\Carbey\.env (Python scraper):
+
+```env
+# Existing C-MATCH credentials
+CMATCH_LOGIN_ID=your_login_id
+CMATCH_PASSWORD=your_password
+
+# Add Supabase credentials (same as above)
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_KEY=your_anon_key_here
+SUPABASE_TABLE=inventories
+SUPABASE_CONFLICT_COLUMN=vehicle_code
+```
+
+
+STEP 5: INSTALL DEPENDENCIES
+-----------------------------
+cd D:\Project\Carbey\web
+npm install
+
+This installs:
+- next@14.2.15
+- react@18.3.1
+- @supabase/supabase-js@2.45.4
+- @supabase/ssr@0.5.1
+- recharts@2.12.7 (for charts)
+- lucide-react@0.454.0 (icons)
+- TypeScript & Tailwind CSS
+
+
+STEP 6: SYNC INVENTORY DATA
+----------------------------
+Make sure you have inventory data in Supabase:
+
+cd D:\Project\Carbey
+python carbey.py sync
+
+This will:
+1. Download CSV from C-MATCH
+2. Parse the data
+3. Upsert to Supabase inventories table
+
+
+STEP 7: START DEVELOPMENT SERVER
+---------------------------------
+cd D:\Project\Carbey\web
+npm run dev
+
+The app will be available at: http://localhost:3000
+
+
+STEP 8: TEST THE APPLICATION
+-----------------------------
+1. Open browser: http://localhost:3000/login
+2. Login with the admin credentials you created
+3. You should be redirected to: http://localhost:3000/admin/dashboard
+4. Verify:
+   - Dashboard shows KPIs (total inventory, on sale, etc.)
+   - Stagnation chart displays
+   - Priority vehicles table shows data
+   - Sidebar navigation works
+   - Inventory management page shows all vehicles
+   - Search and filter work
+
+
+FEATURES OVERVIEW
+================================================================================
+
+DASHBOARD PAGE (/admin/dashboard)
+----------------------------------
+- KPI Cards:
+  * Total inventory count
+  * Vehicles on sale
+  * Average stagnation days
+  * Discount candidates count
+
+- Stagnation Distribution Chart:
+  * Bar chart showing vehicles by age bands
+  * Color-coded: Green (0-30), Blue (31-45), Yellow (46-60), Orange (61-180), Red (180+)
+
+- CVR Statistics:
+  * Average CVR percentage
+  * Progress bar visualization
+  * Breakdown: Excellent (≥5%), Good (2-5%), Needs Improvement (<2%)
+
+- Priority Vehicles Table:
+  * Top 10 vehicles ranked by rotation score
+  * Shows: Maker, Model, Price, Stagnation, CVR, Score
+  * Click to view details
+
+- Discount Candidates Table:
+  * Vehicles with stagnation ≥60 days OR CVR <2%
+  * Shows reason for flagging
+  * Quick edit link
+
+
+INVENTORY MANAGEMENT (/admin/inventory)
+----------------------------------------
+- Full vehicle list with search and filters
+- Search by: Maker, Model, Vehicle Code
+- Filter by: Status (販売中/売約済/非公開)
+- Sortable columns
+- Actions:
+  * Edit vehicle (admin only)
+  * View public page
+  * Delete (admin only, future)
+
+
+AUTHENTICATION & AUTHORIZATION
+-------------------------------
+- Login page with email/password
+- Session-based auth (httpOnly cookies)
+- Automatic redirect if not logged in
+- Role-based access:
+  * Admin: Full CRUD access
+  * Viewer: Read-only analytics access
+- Logout button in header
+
+
+NAVIGATION
+----------
+Sidebar menu:
+- ダッシュボード (Dashboard)
+- 在庫管理 (Inventory Management) - Admin only
+- 分析 (Analytics) - Expandable
+  * 滞留分析 (Stagnation Analysis)
+  * CVR分析 (CVR Analysis)
+  * 価格最適化 (Pricing Optimization)
+- 設定 (Settings) - Admin only
+
+
+DATABASE FUNCTIONS
+================================================================================
+
+calculate_vehicle_metrics(vehicle_id)
+--------------------------------------
+Calculates and updates metrics for a single vehicle:
+- Stagnation days (current_date - published_date)
+- CVR (email_inquiries / detail_views * 100)
+- Rotation score (weighted formula)
+- Discount flag (stagnation ≥60 OR cvr <2)
+
+Usage from SQL:
+```sql
+select calculate_vehicle_metrics('uuid-here');
+```
+
+calculate_all_metrics()
+-----------------------
+Calculates metrics for all vehicles with status='販売中'
+Returns count of processed vehicles
+
+Usage from SQL:
+```sql
+select calculate_all_metrics();
+```
+
+get_dashboard_stats()
+---------------------
+Returns aggregated dashboard statistics in one query
+Returns JSON with: total, on_sale, sold, avg_stagnation, avg_cvr, discount_candidates
+
+Usage from SQL:
+```sql
+select get_dashboard_stats();
+```
+
+
+AUTOMATED TRIGGERS
+------------------
+1. on_price_change
+   - Fires when price_body is updated
+   - Automatically logs to price_histories
+   - Recalculates metrics for that vehicle
+
+2. on_auth_user_created
+   - Fires when new user signs up
+   - Automatically creates user_profiles entry with role='viewer'
+
+3. set_updated_at
+   - Fires on any update to inventories, inventory_metrics, user_profiles
+   - Automatically updates updated_at timestamp
+
+
+TROUBLESHOOTING
+================================================================================
+
+ISSUE: "Could not find the table 'public.inventories'"
+SOLUTION: Run the database migrations (Step 2 above)
+
+ISSUE: "Login failed - Invalid credentials"
+SOLUTION: 
+1. Check that user exists in Supabase Auth
+2. Verify email/password are correct
+3. Check browser console for errors
+
+ISSUE: "Access denied" or empty dashboard
+SOLUTION:
+1. Verify user_profiles entry exists for your user
+2. Check role is set to 'admin'
+3. Run: select * from user_profiles where id = auth.uid();
+
+ISSUE: Dashboard shows 0 vehicles
+SOLUTION:
+1. Run: python carbey.py sync
+2. Check Supabase table: select count(*) from inventories;
+3. Verify RLS policies allow authenticated access
+
+ISSUE: npm install fails
+SOLUTION:
+1. Check Node.js version: node --version (should be 18+)
+2. Clear cache: npm cache clean --force
+3. Delete node_modules and package-lock.json, retry
+
+ISSUE: "Module not found" errors
+SOLUTION:
+1. Verify all files are in correct locations
+2. Check import paths use @/ alias
+3. Restart dev server: npm run dev
+
+
+NEXT STEPS (Phase 3)
+================================================================================
+
+After Phase 2 is working, we'll build:
+
+1. Analytics Pages:
+   - Detailed stagnation analysis with filters
+   - CVR analysis with trends
+   - Price optimization recommendations
+
+2. Inventory Edit Page:
+   - Full form to edit vehicle details
+   - Price history chart
+   - Image upload (future)
+
+3. Settings Page:
+   - User management (add/edit/delete users)
+   - Role assignment
+   - System settings
+
+4. Public Website:
+   - TOP page (brand building)
+   - Sales LP (conversion-focused)
+   - Inventory listing (public)
+   - Vehicle detail pages
+
+
+COMMANDS REFERENCE
+================================================================================
+
+Development:
+  npm run dev          Start dev server (http://localhost:3000)
+  npm run build        Build for production
+  npm run start        Start production server
+  npm run lint         Run ESLint
+
+Python Scraper:
+  python carbey.py sync      Sync inventory from C-MATCH
+  python carbey.py view      View inventory summary
+  python carbey.py stats     Show detailed statistics
+
+Database:
+  supabase db push           Run migrations
+  supabase db reset          Reset database (WARNING: deletes all data)
+  supabase gen types typescript  Generate TypeScript types
+
+
+SUPPORT & DOCUMENTATION
+================================================================================
+
+Supabase Docs: https://supabase.com/docs
+Next.js Docs: https://nextjs.org/docs
+Tailwind CSS: https://tailwindcss.com/docs
+Recharts: https://recharts.org/en-US/
+
+For issues, check:
+1. Browser console (F12)
+2. Terminal output (npm run dev)
+3. Supabase logs (Dashboard → Logs)
+4. Network tab (F12 → Network)
+
+
+================================================================================
+END OF PHASE 2 SETUP GUIDE
+================================================================================
