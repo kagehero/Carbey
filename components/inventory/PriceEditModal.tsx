@@ -28,25 +28,25 @@ export default function PriceEditModal({ vehicleId, currentPrice, onClose }: Pri
     setSaving(true)
     try {
       // Update vehicle price
-      const { error: updateError } = await supabase
-        .from('inventories')
+      const { error: updateError } = await (supabase
+        .from('inventories') as any)
         .update({
           price_body: newPrice,
           updated_at: new Date().toISOString()
-        } as any)
+        })
         .eq('id', vehicleId)
 
       if (updateError) throw updateError
 
       // Record price history
-      const { error: historyError } = await supabase
-        .from('price_history')
+      const { error: historyError } = await (supabase
+        .from('price_history') as any)
         .insert({
           vehicle_id: vehicleId,
           old_price: currentPrice,
           new_price: newPrice,
           change_reason: reason || null
-        } as any)
+        })
 
       if (historyError) console.error('Price history error:', historyError)
 

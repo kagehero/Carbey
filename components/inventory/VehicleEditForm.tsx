@@ -74,12 +74,12 @@ export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
     setError(null)
 
     try {
-      const { error: updateError } = await supabase
-        .from('inventories')
+      const { error: updateError } = await (supabase
+        .from('inventories') as any)
         .update({
           ...formData,
           updated_at: new Date().toISOString()
-        } as any)
+        })
         .eq('id', vehicle.id)
 
       if (updateError) throw updateError

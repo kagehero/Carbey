@@ -21,12 +21,12 @@ export default function StatusChangeDropdown({ vehicleId, currentStatus }: Statu
     
     setIsChanging(true)
     try {
-      const { error } = await supabase
-        .from('inventories')
+      const { error } = await (supabase
+        .from('inventories') as any)
         .update({ 
           status: newStatus,
           updated_at: new Date().toISOString()
-        } as any)
+        })
         .eq('id', vehicleId)
 
       if (error) throw error
