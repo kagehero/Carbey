@@ -17,7 +17,7 @@ async function getVehicle(id: string) {
     return null
   }
 
-  return vehicle
+  return vehicle as any
 }
 
 export default async function VehicleEditPage({ 
