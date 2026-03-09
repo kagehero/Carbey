@@ -26,7 +26,7 @@ export default function StatusChangeDropdown({ vehicleId, currentStatus }: Statu
         .update({ 
           status: newStatus,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', vehicleId)
 
       if (error) throw error

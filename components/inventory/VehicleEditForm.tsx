@@ -79,7 +79,7 @@ export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
         .update({
           ...formData,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', vehicle.id)
 
       if (updateError) throw updateError

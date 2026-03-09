@@ -30,10 +30,10 @@ export default function PriceEditModal({ vehicleId, currentPrice, onClose }: Pri
       // Update vehicle price
       const { error: updateError } = await supabase
         .from('inventories')
-        .update({ 
+        .update({
           price_body: newPrice,
           updated_at: new Date().toISOString()
-        })
+        } as any)
         .eq('id', vehicleId)
 
       if (updateError) throw updateError
@@ -46,7 +46,7 @@ export default function PriceEditModal({ vehicleId, currentPrice, onClose }: Pri
           old_price: currentPrice,
           new_price: newPrice,
           change_reason: reason || null
-        })
+        } as any)
 
       if (historyError) console.error('Price history error:', historyError)
 
