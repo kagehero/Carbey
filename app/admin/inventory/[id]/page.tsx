@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { formatPrice, formatMileage, calculateStagnationDays, calculateCVR, getStagnationColor, getCVRColor, getNoStagnationReason } from '@/lib/utils'
-import { Calendar, Eye, Mail, Phone, MapPin, Gauge, Palette, Car, AlertCircle } from 'lucide-react'
+import { Calendar, Eye, Mail, Phone, MapPin, Gauge, Palette, Car, AlertCircle, Edit } from 'lucide-react'
 import Link from 'next/link'
 
 async function getVehicle(id: string) {
@@ -133,12 +133,22 @@ export default async function VehicleDetailPage({
           <p className="text-gray-500 mt-1">{vehicle.grade}</p>
         </div>
 
-        <Link
-          href="/admin/inventory"
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          一覧に戻る
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/admin/inventory/${vehicle.id}/edit`}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Edit className="w-4 h-4" />
+            編集
+          </Link>
+          
+          <Link
+            href="/admin/inventory"
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            一覧に戻る
+          </Link>
+        </div>
       </div>
 
       {/* Key Metrics Cards */}
