@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import InventoryTable from '@/components/inventory/InventoryTable'
+import EnhancedInventoryTable from '@/components/inventory/EnhancedInventoryTable'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
 
@@ -38,9 +38,7 @@ export default async function InventoryPage() {
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
-        <InventoryTable inventories={inventories || []} />
-      </div>
+      <EnhancedInventoryTable inventories={inventories || []} />
     </div>
   )
 }
