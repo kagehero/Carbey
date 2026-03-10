@@ -18,7 +18,7 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
   // Filter inventories
-  const filtered = inventories.filter(inv => {
+  const filtered = inventories.filter((inv: any) => {
     const matchesSearch = 
       inv.maker?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.car_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -30,7 +30,7 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
   })
 
   // Sort inventories
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = [...filtered].sort((a: any, b: any) => {
     let comparison = 0
     
     switch(sortBy) {
@@ -134,7 +134,7 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
 
       {/* Colorful Grid View */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        {sorted.map((inv) => {
+        {sorted.map((inv: any) => {
           const stagnation = calculateStagnationDays(inv.published_date)
           const noStagnationReason = getNoStagnationReason(inv.published_date, inv.publication_status, inv.status)
           const priceTrend = getPriceTrend(inv.price_body)

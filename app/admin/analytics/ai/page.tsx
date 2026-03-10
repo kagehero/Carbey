@@ -3,6 +3,25 @@ import { calculateStagnationDays, calculateCVR } from '@/lib/utils'
 import { Brain, TrendingUp, DollarSign, AlertTriangle, CheckCircle, Target, Zap } from 'lucide-react'
 import Link from 'next/link'
 
+type Priority = 'high' | 'medium' | 'low'
+type Impact = 'high' | 'medium' | 'low'
+type Effort = 'low' | 'medium' | 'high'
+type ColorKey = 'red' | 'orange' | 'yellow' | 'green'
+
+interface Recommendation {
+  id: number
+  priority: Priority
+  category: string
+  title: string
+  description: string
+  impact: Impact
+  effort: Effort
+  vehicles: any[]
+  action: string
+  icon: typeof DollarSign
+  color: ColorKey
+}
+
 async function getAIInsights() {
   const supabase = await createClient()
 
@@ -48,7 +67,7 @@ async function getAIInsights() {
   }
 
   // AI Recommendations
-  const recommendations = [
+  const recommendations: Recommendation[] = [
     {
       id: 1,
       priority: 'high',
@@ -107,15 +126,15 @@ async function getAIInsights() {
 }
 
 export default async function AIAnalysisPage() {
-  const { insights, recommendations, vehicles } = await getAIInsights()
+  const { insights, recommendations } = await getAIInsights()
 
-  const priorityColors = {
+  const priorityColors: Record<Priority, string> = {
     high: 'bg-red-50 border-red-200 text-red-800',
     medium: 'bg-yellow-50 border-yellow-200 text-yellow-800',
     low: 'bg-green-50 border-green-200 text-green-800'
   }
 
-  const iconColors = {
+  const iconColors: Record<ColorKey, string> = {
     red: 'bg-red-100 text-red-600',
     orange: 'bg-orange-100 text-orange-600',
     yellow: 'bg-yellow-100 text-yellow-600',
