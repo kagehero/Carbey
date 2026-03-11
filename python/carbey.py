@@ -13,6 +13,9 @@ import requests
 
 from scraper.csv_downloader import CMatchCSVDownloader
 from scraper.csv_parser import CMatchCSVParser
+from scraper.image_scraper import CMatchImageScraper
+from scraper.bulk_image_scraper import BulkImageScraper
+from scraper.construct_image_urls import construct_all_image_urls
 from config import Config
 
 
@@ -36,10 +39,55 @@ def sync_to_supabase(vehicles: List[Dict]):
         # Convert empty strings to None for date fields
         if vehicle.get('published_date') == '':
             vehicle['published_date'] = None
-        # Remove 'index' and 'scraped_at' fields (not compatible with schema or already set)
-        for field in ['index']:
-            if field in vehicle:
-                del vehicle[field]
+        
+        # Convert string numbers to proper numeric types
+        numeric_fields = [
+            'year', 'year_month', 'price_body', 'price_total', 'mileage', 
+            'days_listed', 'days_listed_numeric',
+            'price_body_numeric', 'price_total_numeric', 'mileage_numeric',
+            'plan_count', 'image_count', 'caption_count',
+            'detail_views', 'email_inquiries', 'phone_inquiries', 
+            'map_views', 'favorites', 'reused_days_remaining'
+        ]
+        
+        for field in numeric_fields:
+            if field in vehicle and vehicle[field] is not None:
+                try:
+                    val = vehicle[field]
+                    if isinstance(val, str):
+                        if val.strip() == '':
+                            vehicle[field] = None
+                        else:
+                            # Remove any non-numeric characters except . and -
+                            clean_val = val.strip()
+                            float_val = float(clean_val)
+                            # PostgreSQL numeric type accepts both int and float
+                            vehicle[field] = float_val
+                except (ValueError, AttributeError):
+                    vehicle[field] = None
+        
+        # Convert date strings to proper format
+        date_fields = ['registered_date', 'updated_date']
+        for field in date_fields:
+            if field in vehicle and vehicle[field]:
+                try:
+                    # Convert "2026/01/09 09:33" to "2026-01-09"
+                    val = str(vehicle[field])
+                    if '/' in val:
+                        date_part = val.split()[0]  # Get date part only
+                        vehicle[field] = date_part.replace('/', '-')
+                except:
+                    vehicle[field] = None
+        
+        # Clean inspection field (it's text, not a date in our schema)
+        # Values like "2026年12月" or "車検整備付" should remain as text
+        # No conversion needed, but ensure it's a string
+        if 'inspection' in vehicle and vehicle['inspection'] is not None:
+            vehicle['inspection'] = str(vehicle['inspection'])
+        
+        # Remove 'index' field (not in schema)
+        if 'index' in vehicle:
+            del vehicle['index']
 
     table = Config.SUPABASE_TABLE
     conflict_col = Config.SUPABASE_CONFLICT_COLUMN
@@ -56,18 +104,38 @@ def sync_to_supabase(vehicles: List[Dict]):
     if conflict_col:
         params["on_conflict"] = conflict_col
 
-    batch_size = 100
+    batch_size = 10  # Smaller batch size for better error handling
     total = len(filtered)
+    print(f"[INFO] Syncing {total} vehicles in batches of {batch_size}...")
+    
     for i in range(0, total, batch_size):
         chunk = filtered[i : i + batch_size]
+        batch_num = i // batch_size + 1
+        
+        print(f"  Batch {batch_num}/{(total + batch_size - 1) // batch_size}: vehicles {i+1}-{min(i+batch_size, total)}")
+        
         resp = requests.post(url, params=params, headers=headers, json=chunk)
         if not resp.ok:
+            # Save failed payload for debugging
+            debug_dir = Path("debug")
+            debug_dir.mkdir(exist_ok=True)
+            with open(debug_dir / f"failed_batch_{batch_num}.json", 'w', encoding='utf-8') as f:
+                json.dump(chunk, f, ensure_ascii=False, indent=2)
+            
+            print(f"\n[ERROR] Batch {batch_num} failed!")
+            print(f"  Vehicle codes in this batch:")
+            for v in chunk:
+                print(f"    - {v.get('vehicle_code')}: {v.get('maker')} {v.get('car_name')}")
+            
             raise RuntimeError(
-                f"Supabase sync failed at batch {i // batch_size + 1}: {resp.status_code} {resp.text}"
+                f"Supabase sync failed at batch {batch_num}: {resp.status_code} {resp.text}\n"
+                f"Failed payload saved to debug/failed_batch_{batch_num}.json"
             )
+    
+    print(f"[SUCCESS] All {total} vehicles synced successfully!")
 
 
-def cmd_sync():
+def cmd_sync(with_images: bool = False, max_images: int = None):
     """Download, parse, and save latest inventory"""
     print("="*70)
     print("Syncing Inventory from C-MATCH")
@@ -76,15 +144,25 @@ def cmd_sync():
     
     try:
         # Download CSV
-        print("[1/2] Downloading CSV...")
+        print("[1/3] Downloading CSV...")
         downloader = CMatchCSVDownloader()
         csv_file = downloader.download_csv()
         
         # Parse CSV
-        print("\n[2/2] Parsing data...")
+        print("\n[2/3] Parsing data...")
         parser = CMatchCSVParser()
         vehicles = parser.parse_csv(csv_file)
         json_file = parser.save_to_json(vehicles)
+
+        # Scrape images if requested
+        if with_images:
+            print("\n[3/3] Scraping vehicle images...")
+            image_scraper = CMatchImageScraper()
+            vehicles = image_scraper.scrape_images(vehicles, max_vehicles=max_images)
+            # Save updated data with images
+            json_file = parser.save_to_json(vehicles)
+        else:
+            print("\n[3/3] Skipping image scraping (use --images flag to enable)")
 
         # Save to Supabase
         print("\nSaving to Supabase (upsert)...")
@@ -92,12 +170,86 @@ def cmd_sync():
         
         # Summary
         print("\n" + "="*70)
+        vehicles_with_images = sum(1 for v in vehicles if v.get('main_image_url'))
         print(f"✓ Success: {len(vehicles)} vehicles synced and saved to Supabase")
+        if with_images:
+            print(f"  Images scraped: {vehicles_with_images}/{len(vehicles)}")
         print("="*70)
         
         return 0
     except Exception as e:
         print(f"\n✗ Error: {e}")
+        return 1
+
+
+def cmd_scrape_images(max_vehicles: int = None, max_pages: int = None, use_construct: bool = False):
+    """Scrape images for existing inventory"""
+    print("="*70)
+    print("Scraping Vehicle Images from C-MATCH")
+    print("="*70)
+    print()
+    
+    try:
+        # Load latest inventory
+        latest_json = Config.get_latest_file(Config.PARSED_DIR, "inventory_parsed_*.json")
+        
+        if not latest_json:
+            print("[ERROR] No inventory data found. Run: carbey sync")
+            return 1
+        
+        with open(latest_json, 'r', encoding='utf-8') as f:
+            vehicles = json.load(f)
+        
+        print(f"[INFO] Loaded {len(vehicles)} vehicles from {latest_json.name}")
+        
+        if use_construct:
+            # Method 2: Construct URLs for ALL vehicles (faster, no scraping)
+            print(f"\n[INFO] Constructing image URLs for all vehicles (fast method)")
+            print(f"[INFO] This will verify each URL exists (~1-2 seconds per vehicle)")
+            print(f"[INFO] Estimated time: {len(vehicles) * 1.5 / 60:.1f} minutes")
+            
+            image_map = construct_all_image_urls(vehicles, verify=True)
+        else:
+            # Method 1: Scrape from registration list (only gets published vehicles)
+            print(f"\n[INFO] Using bulk scraper with pagination")
+            if max_pages:
+                print(f"[INFO] Limiting to {max_pages} pages (~{max_pages * 50} vehicles)")
+            else:
+                print(f"[INFO] Scraping ALL pages")
+            
+            bulk_scraper = BulkImageScraper()
+            image_map = bulk_scraper.scrape_all_images(max_pages=max_pages)
+        
+        # Match images to vehicles
+        matched = 0
+        for vehicle in vehicles:
+            vehicle_code = vehicle.get('vehicle_code')
+            if vehicle_code and vehicle_code in image_map:
+                vehicle['main_image_url'] = image_map[vehicle_code]
+                vehicle['image_urls'] = [image_map[vehicle_code]]
+                vehicle['images_scraped_at'] = datetime.now().isoformat()
+                matched += 1
+        
+        print(f"\n[INFO] Matched {matched}/{len(vehicles)} vehicles with images")
+        
+        # Save updated data
+        parser = CMatchCSVParser()
+        json_file = parser.save_to_json(vehicles)
+        
+        # Update Supabase
+        print("\nUpdating Supabase with image URLs...")
+        sync_to_supabase(vehicles)
+        
+        # Summary
+        print("\n" + "="*70)
+        print(f"✓ Success: {matched}/{len(vehicles)} vehicles now have images")
+        print("="*70)
+        
+        return 0
+    except Exception as e:
+        print(f"\n✗ Error: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
 
 
@@ -264,7 +416,17 @@ Usage:
   carbey <command> [options]
 
 Commands:
-  sync              Download and parse latest inventory from C-MATCH
+  sync [--images] [--max-images=N]
+                    Download and parse latest inventory from C-MATCH
+                    --images: Also scrape vehicle images
+                    --max-images=N: Limit image scraping to N vehicles
+  
+  scrape-images [--construct] [--max-pages=N]
+                    Scrape images for existing inventory
+                    --construct: Construct URLs for ALL vehicles (recommended)
+                    --max-pages=N: Limit to N pages (only without --construct)
+                    No flags = scrape from registration list pages
+  
   view [keyword]    View inventory summary or search by keyword
   stats             Show detailed statistics
   export [format]   Export data (json/csv)
@@ -272,7 +434,12 @@ Commands:
   help              Show this help message
 
 Examples:
-  carbey sync                  # Sync inventory
+  carbey sync                  # Sync inventory (no images)
+  carbey sync --images         # Sync with images (all vehicles)
+  carbey sync --images --max-images=10  # Sync with images (first 10)
+  carbey scrape-images --construct    # Construct URLs for ALL 306 vehicles (recommended)
+  carbey scrape-images                # Scrape from registration list (150 vehicles)
+  carbey scrape-images --max-pages=3  # Scrape first 3 pages only
   carbey view                  # Show summary
   carbey view トヨタ            # Search for Toyota vehicles
   carbey stats                 # Detailed statistics
@@ -293,7 +460,40 @@ def main():
     
     try:
         if command == "sync":
-            return cmd_sync()
+            # Check for --images flag
+            with_images = "--images" in sys.argv
+            max_images = None
+            
+            # Check for --max-images=N
+            for arg in sys.argv:
+                if arg.startswith("--max-images="):
+                    try:
+                        max_images = int(arg.split("=")[1])
+                    except:
+                        pass
+            
+            return cmd_sync(with_images=with_images, max_images=max_images)
+        
+        elif command == "scrape-images":
+            max_pages = None
+            use_construct = "--construct" in sys.argv
+            
+            # Check for --max-pages=N flag
+            for arg in sys.argv:
+                if arg.startswith("--max-pages="):
+                    try:
+                        max_pages = int(arg.split("=")[1])
+                    except:
+                        pass
+            
+            # Legacy: single number argument = max_pages
+            if len(sys.argv) > 2 and not sys.argv[2].startswith("--"):
+                try:
+                    max_pages = int(sys.argv[2])
+                except:
+                    pass
+            
+            return cmd_scrape_images(max_pages=max_pages, use_construct=use_construct)
         
         elif command == "view":
             keyword = sys.argv[2] if len(sys.argv) > 2 else None
