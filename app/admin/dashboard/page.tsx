@@ -24,6 +24,14 @@ async function getDashboardStats() {
   const onSale = typedInventories.filter(i => i.status === '販売中').length || 0
   const sold = typedInventories.filter(i => i.status === '売約済').length || 0
   const unpublished = typedInventories.filter(i => i.status === '非公開').length || 0
+  
+  // Publication status stats
+  const published = typedInventories.filter(i => i.publication_status === '掲載').length || 0
+  const notPublished = typedInventories.filter(i => i.publication_status === '非掲載').length || 0
+  
+  // Stock status stats
+  const inStock = typedInventories.filter(i => i.stock_status === 'あり').length || 0
+  const outOfStock = typedInventories.filter(i => i.stock_status === 'なし').length || 0
 
   // Calculate average stagnation
   const stagnationDays = typedInventories
@@ -90,6 +98,10 @@ async function getDashboardStats() {
       onSale,
       sold,
       unpublished,
+      published,
+      notPublished,
+      inStock,
+      outOfStock,
       avgStagnation,
       avgCVR,
       discountCount
