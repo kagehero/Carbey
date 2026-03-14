@@ -67,6 +67,9 @@ export interface Database {
           map_views: number | null
           favorites: number | null
           scraped_at: string | null
+          main_image_url: string | null
+          image_urls: string[] | null
+          images_scraped_at: string | null
           inserted_at: string
           updated_at: string
         }
@@ -187,6 +190,9 @@ export interface Database {
           map_views?: number | null
           favorites?: number | null
           scraped_at?: string | null
+          main_image_url?: string | null
+          image_urls?: string[] | null
+          images_scraped_at?: string | null
           inserted_at?: string
           updated_at?: string
         }
