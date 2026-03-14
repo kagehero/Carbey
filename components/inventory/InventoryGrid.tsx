@@ -16,6 +16,8 @@ type SortOption = 'newest' | 'price-low' | 'price-high' | 'stagnation-low' | 'st
 export default function InventoryGrid({ inventories }: InventoryGridProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [publicationFilter, setPublicationFilter] = useState<string>('all')
+  const [stockFilter, setStockFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [showFilters, setShowFilters] = useState(false)
 
@@ -42,9 +44,15 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
       const matchesStatus = 
         statusFilter === 'all' || inv.status === statusFilter
 
-      return matchesSearch && matchesStatus
+      const matchesPublication = 
+        publicationFilter === 'all' || inv.publication_status === publicationFilter
+
+      const matchesStock = 
+        stockFilter === 'all' || inv.stock_status === stockFilter
+
+      return matchesSearch && matchesStatus && matchesPublication && matchesStock
     })
-  }, [vehiclesWithData, searchTerm, statusFilter])
+  }, [vehiclesWithData, searchTerm, statusFilter, publicationFilter, stockFilter])
 
   // Sort
   const sorted = useMemo(() => {
@@ -109,7 +117,37 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
 
         {/* Expanded Filters */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                掲載状態
+              </label>
+              <select
+                value={publicationFilter}
+                onChange={(e) => setPublicationFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">すべて</option>
+                <option value="掲載">掲載中のみ</option>
+                <option value="非掲載">非掲載のみ</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                在庫有無
+              </label>
+              <select
+                value={stockFilter}
+                onChange={(e) => setStockFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">すべて</option>
+                <option value="あり">在庫あり</option>
+                <option value="なし">在庫なし</option>
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 ステータス
@@ -148,10 +186,24 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
           </div>
         )}
 
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">
-            {sorted.length}台 / 全{inventories.length}台
-          </span>
+        <div className="flex items-center justify-between text-sm flex-wrap gap-2">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="text-gray-600 font-medium">
+              {sorted.length}台 / 全{inventories.length}台
+            </span>
+            <span className="text-blue-600">
+              📢 掲載: {inventories.filter(v => v.publication_status === '掲載').length}台
+            </span>
+            <span className="text-gray-600">
+              📋 非掲載: {inventories.filter(v => v.publication_status === '非掲載').length}台
+            </span>
+            <span className="text-green-600">
+              ✓ 在庫あり: {inventories.filter(v => v.stock_status === 'あり').length}台
+            </span>
+            <span className="text-red-600">
+              ✗ 在庫なし: {inventories.filter(v => v.stock_status === 'なし').length}台
+            </span>
+          </div>
           <span className="text-gray-500">
             並び替え: {
               sortBy === 'newest' ? '新着順' :
@@ -202,15 +254,29 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
                   </div>
                 </div>
 
-                {/* Status Badge - Top Right */}
-                <div className="absolute top-2 right-2">
+                {/* Status Badges - Top Right */}
+                <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                   <div className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-sm ${
-                    vehicle.status === '販売中' ? 'bg-green-500/90 text-white' :
-                    vehicle.status === '売約済' ? 'bg-red-500/90 text-white' :
+                    vehicle.publication_status === '掲載' ? 'bg-blue-500/90 text-white' :
                     'bg-gray-500/90 text-white'
                   }`}>
-                    {vehicle.status}
+                    {vehicle.publication_status === '掲載' ? '📢 掲載中' : '📋 非掲載'}
                   </div>
+                  <div className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-sm ${
+                    vehicle.stock_status === 'あり' ? 'bg-green-600/90 text-white' :
+                    'bg-red-600/90 text-white'
+                  }`}>
+                    {vehicle.stock_status === 'あり' ? '✓ 在庫あり' : '✗ 在庫なし'}
+                  </div>
+                  {vehicle.status && (
+                    <div className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-sm ${
+                      vehicle.status === '販売中' ? 'bg-emerald-500/90 text-white' :
+                      vehicle.status === '売約済' ? 'bg-rose-500/90 text-white' :
+                      'bg-slate-500/90 text-white'
+                    }`}>
+                      {vehicle.status}
+                    </div>
+                  )}
                 </div>
 
                 {/* Views Badge - Bottom Right */}
@@ -296,32 +362,64 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
       )}
 
       {/* Legend */}
-      <div className="bg-white rounded-lg border p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">滞留日数の色分け</h3>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-            <span>未掲載</span>
+      <div className="bg-white rounded-lg border p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">掲載状態</h3>
+            <div className="flex gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-blue-500"></div>
+                <span>📢 掲載中 - カーセンサーに公開中</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-gray-500"></div>
+                <span>📋 非掲載 - 在庫のみ管理</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span>0-30日 (新着)</span>
+          
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">在庫有無</h3>
+            <div className="flex gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-green-600"></div>
+                <span>✓ 在庫あり - 実在庫保有</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-red-600"></div>
+                <span>✗ 在庫なし - 取り寄せ等</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <span>31-60日 (注視)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-            <span>61-90日 (注意)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span>91-180日 (警告)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-            <span>181日以上 (緊急)</span>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">滞留日数の色分け</h3>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+              <span>未掲載</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span>0-30日 (新着)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>31-60日 (注視)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <span>61-90日 (注意)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span>91-180日 (警告)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+              <span>181日以上 (緊急)</span>
+            </div>
           </div>
         </div>
       </div>

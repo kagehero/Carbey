@@ -10,6 +10,10 @@ interface DashboardStatsProps {
     onSale: number
     sold: number
     unpublished: number
+    published: number
+    notPublished: number
+    inStock: number
+    outOfStock: number
     avgStagnation: number
     avgCVR: string
     discountCount: number
@@ -30,6 +34,7 @@ export default function DashboardStats({ initialStats }: DashboardStatsProps) {
     {
       label: '在庫総数',
       value: initialStats.total,
+      subValue: `掲載: ${initialStats.published}台 | 非掲載: ${initialStats.notPublished}台`,
       icon: Package,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50'
@@ -37,6 +42,7 @@ export default function DashboardStats({ initialStats }: DashboardStatsProps) {
     {
       label: '販売中',
       value: initialStats.onSale,
+      subValue: `在庫あり: ${initialStats.inStock}台 | 在庫なし: ${initialStats.outOfStock}台`,
       icon: TrendingUp,
       color: 'text-green-600',
       bgColor: 'bg-green-50'
@@ -79,11 +85,16 @@ export default function DashboardStats({ initialStats }: DashboardStatsProps) {
         {kpis.map((kpi) => (
           <div key={kpi.label} className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-gray-500">{kpi.label}</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">
                   {kpi.value}
                 </p>
+                {'subValue' in kpi && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {kpi.subValue}
+                  </p>
+                )}
               </div>
               <div className={`p-3 rounded-lg ${kpi.bgColor}`}>
                 <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
