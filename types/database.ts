@@ -273,6 +273,35 @@ export interface Database {
           changed_at?: string
         }
       }
+      notification_settings: {
+        Row: {
+          user_id: string
+          email_enabled: boolean
+          stagnation_alert_enabled: boolean
+          stagnation_threshold_days: number
+          price_change_enabled: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          email_enabled?: boolean
+          stagnation_alert_enabled?: boolean
+          stagnation_threshold_days?: number
+          price_change_enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          email_enabled?: boolean
+          stagnation_alert_enabled?: boolean
+          stagnation_threshold_days?: number
+          price_change_enabled?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       user_profiles: {
         Row: {
           id: string

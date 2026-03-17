@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Settings, User, Bell, Lock, Database } from 'lucide-react'
+import { User, Bell, Lock, Database } from 'lucide-react'
 import { UserProfile } from '@/types'
+import type { NotificationSettings } from '@/types'
+import NotificationSettingsForm from '@/components/settings/NotificationSettingsForm'
+import AccountActions from '@/components/settings/AccountActions'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -20,6 +23,14 @@ export default async function SettingsPage() {
 
   const profile = data as UserProfile | null
 
+  const { data: notificationSettings } = await supabase
+    .from('notification_settings')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const typedNotificationSettings = notificationSettings as NotificationSettings | null
+
   const settingsSections = [
     {
       title: 'アカウント設定',
@@ -28,15 +39,6 @@ export default async function SettingsPage() {
         { label: 'メールアドレス', value: user.email },
         { label: 'ロール', value: profile?.role || 'viewer' },
         { label: '登録日', value: user.created_at ? new Date(user.created_at).toLocaleDateString('ja-JP') : '-' },
-      ]
-    },
-    {
-      title: '通知設定',
-      icon: Bell,
-      items: [
-        { label: 'メール通知', value: '有効' },
-        { label: '滞留アラート', value: '180日以上' },
-        { label: '価格変更通知', value: '有効' },
       ]
     },
     {
@@ -83,26 +85,22 @@ export default async function SettingsPage() {
             </div>
           )
         })}
+
+        <div id="notification-settings" className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Bell className="w-5 h-5 text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900">通知設定</h2>
+            </div>
+          </div>
+          <div className="p-6">
+            <NotificationSettingsForm userId={user.id} initial={typedNotificationSettings} />
+          </div>
+        </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Settings className="w-5 h-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">クイックアクション</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700">
-            パスワード変更
-          </button>
-          <button className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700">
-            通知設定
-          </button>
-          <button className="px-4 py-3 border border-red-300 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium text-red-600">
-            アカウント削除
-          </button>
-        </div>
-      </div>
+      <AccountActions />
 
       {/* Info Notice */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
