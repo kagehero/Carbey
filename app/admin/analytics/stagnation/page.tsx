@@ -1,7 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
-import { calculateStagnationDays, getStagnationBand, getStagnationColor, formatPrice } from '@/lib/utils'
+import { calculateStagnationDays, getStagnationColor, formatPrice } from '@/lib/utils'
 import { Download, TrendingUp, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+
+const STAGNATION_BANDS = [
+  { key: 'b0_15', label: '0-15日', min: 0, max: 15, tone: '正常', color: 'bg-green-100 text-green-800 border-green-200' },
+  { key: 'b16_30', label: '16-30日', min: 16, max: 30, tone: '正常', color: 'bg-green-100 text-green-800 border-green-200' },
+  { key: 'b31_45', label: '31-45日', min: 31, max: 45, tone: '注視', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { key: 'b46_60', label: '46-60日', min: 46, max: 60, tone: '注意', color: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+  { key: 'b61_90', label: '61-90日', min: 61, max: 90, tone: '警告', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { key: 'b91_120', label: '91-120日', min: 91, max: 120, tone: '警告', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { key: 'b121_180', label: '121-180日', min: 121, max: 180, tone: '警告', color: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { key: 'b181_240', label: '181-240日', min: 181, max: 240, tone: '緊急', color: 'bg-red-100 text-red-800 border-red-200' },
+  { key: 'b241_365', label: '241-365日', min: 241, max: 365, tone: '緊急', color: 'bg-red-100 text-red-800 border-red-200' },
+  { key: 'b366_plus', label: '366日超', min: 366, max: Infinity, tone: '緊急', color: 'bg-red-100 text-red-800 border-red-200' },
+] as const
 
 async function getStagnationData() {
   const supabase = await createClient()
@@ -12,20 +25,19 @@ async function getStagnationData() {
     .eq('status', '販売中')
     .order('published_date', { ascending: true })
 
-  const vehicles = (inventories || []).map((v: any) => ({
-    ...v,
-    stagnation_days: calculateStagnationDays(v.published_date),
-    band: getStagnationBand(calculateStagnationDays(v.published_date!))
-  }))
+  const vehicles = (inventories || []).map((v: any) => {
+    const stagnation_days = calculateStagnationDays(v.published_date)
+    const band = STAGNATION_BANDS.find(b => stagnation_days >= b.min && stagnation_days <= b.max)?.key ?? 'b0_15'
+    return {
+      ...v,
+      stagnation_days,
+      band,
+    }
+  })
 
-  // Group by bands
-  const bands = {
-    normal: vehicles.filter(v => v.band === 'normal'),
-    watch: vehicles.filter(v => v.band === 'watch'),
-    attention: vehicles.filter(v => v.band === 'attention'),
-    critical: vehicles.filter(v => v.band === 'critical'),
-    urgent: vehicles.filter(v => v.band === 'urgent'),
-  }
+  const bands = Object.fromEntries(
+    STAGNATION_BANDS.map(b => [b.key, vehicles.filter(v => v.band === b.key)])
+  ) as Record<(typeof STAGNATION_BANDS)[number]['key'], any[]>
 
   const total = vehicles.length
 
@@ -35,13 +47,12 @@ async function getStagnationData() {
 export default async function StagnationAnalysisPage() {
   const { vehicles, bands, total } = await getStagnationData()
 
-  const bandInfo = [
-    { key: 'normal', label: '0-30日 (正常)', color: 'bg-green-100 text-green-800 border-green-200', count: bands.normal.length },
-    { key: 'watch', label: '31-45日 (注視)', color: 'bg-blue-100 text-blue-800 border-blue-200', count: bands.watch.length },
-    { key: 'attention', label: '46-60日 (注意)', color: 'bg-yellow-100 text-yellow-800 border-yellow-200', count: bands.attention.length },
-    { key: 'critical', label: '61-180日 (警告)', color: 'bg-orange-100 text-orange-800 border-orange-200', count: bands.critical.length },
-    { key: 'urgent', label: '180日超 (緊急)', color: 'bg-red-100 text-red-800 border-red-200', count: bands.urgent.length },
-  ]
+  const bandInfo = STAGNATION_BANDS.map(b => ({
+    key: b.key,
+    label: `${b.label} (${b.tone})`,
+    color: b.color,
+    count: bands[b.key].length,
+  }))
 
   return (
     <div className="space-y-6">
@@ -58,7 +69,7 @@ export default async function StagnationAnalysisPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-10 gap-3">
         {bandInfo.map((band) => (
           <div key={band.key} className={`${band.color} border rounded-lg p-4`}>
             <div className="text-sm font-medium mb-1">{band.label}</div>
@@ -73,7 +84,7 @@ export default async function StagnationAnalysisPage() {
       {/* Detailed Tables by Band */}
       {bandInfo.filter(b => b.count > 0).map((band) => {
         const key = band.key as keyof typeof bands
-        const vehiclesInBand = bands[key]
+        const vehiclesInBand = bands[key] || []
 
         return (
           <div key={band.key} className="bg-white rounded-lg shadow">
@@ -85,7 +96,7 @@ export default async function StagnationAnalysisPage() {
                     {band.count}台
                   </span>
                 </div>
-                {band.key !== 'normal' && (
+                {band.key !== 'b0_15' && band.key !== 'b16_30' && (
                   <div className="flex items-center gap-2 text-sm text-orange-600">
                     <AlertTriangle className="w-4 h-4" />
                     対応が必要な可能性があります

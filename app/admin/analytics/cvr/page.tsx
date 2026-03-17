@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateCVR, getCVRColor, formatPrice, formatNumber } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import Link from 'next/link'
+import CVRPoorBulkTable from '@/components/analytics/CVRPoorBulkTable'
 
 async function getCVRData() {
   const supabase = await createClient()
@@ -167,59 +168,8 @@ export default async function CVRAnalysisPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">車両</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">価格</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">閲覧数</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">問合せ数</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CVR</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">推奨アクション</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {poor.slice(0, 15).map((vehicle) => (
-                  <tr key={vehicle.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {vehicle.maker} {vehicle.car_name}
-                      </div>
-                      <div className="text-xs text-gray-500">{vehicle.grade}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatPrice(vehicle.price_body)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatNumber(vehicle.detail_views)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatNumber(vehicle.email_inquiries)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr)}`}>
-                        {vehicle.cvr.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-xs">
-                      <div className="text-gray-600">
-                        {vehicle.cvr < 1 ? '価格見直し推奨' : '情報・写真追加'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <Link
-                        href={`/admin/inventory/${vehicle.id}`}
-                        className="text-primary hover:text-primary/80"
-                      >
-                        編集
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-6">
+            <CVRPoorBulkTable rows={poor.slice(0, 50) as any} />
           </div>
         </div>
       )}

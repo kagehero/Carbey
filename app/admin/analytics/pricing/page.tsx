@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateStagnationDays, calculateCVR, formatPrice, getStagnationColor, getCVRColor } from '@/lib/utils'
 import { DollarSign, AlertCircle, TrendingDown, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
+import PricingBulkTable from '@/components/pricing/PricingBulkTable'
 
 async function getPricingData() {
   const supabase = await createClient()
@@ -22,10 +23,9 @@ async function getPricingData() {
     v.stagnation_days >= 60 || (v.cvr > 0 && v.cvr < 2)
   ).sort((a, b) => b.stagnation_days - a.stagnation_days)
 
-  // Calculate suggested discount
-  const withSuggestions = discountCandidates.map(v => {
+  const suggestOptimization = (v: any) => {
     let discountPct = 0
-    let reason = []
+    const reason: string[] = []
     
     if (v.stagnation_days >= 180) {
       discountPct = 15
@@ -49,14 +49,72 @@ async function getPricingData() {
     const currentPrice = v.price_body || 0
     const suggestedPrice = Math.floor(currentPrice * (1 - discountPct / 100))
     const discountAmount = currentPrice - suggestedPrice
+    return { discountPct, suggestedPrice, discountAmount, reason: reason.join(', ') }
+  }
 
+  // "AI" mode here is a separate, more granular heuristic for verification.
+  const suggestAI = (v: any) => {
+    let discountPct = 0
+    const reason: string[] = []
+
+    // Base from stagnation (more granular than optimization)
+    if (v.stagnation_days >= 365) {
+      discountPct = 20
+      reason.push('365日超')
+    } else if (v.stagnation_days >= 240) {
+      discountPct = 18
+      reason.push('240日超')
+    } else if (v.stagnation_days >= 180) {
+      discountPct = 15
+      reason.push('180日超')
+    } else if (v.stagnation_days >= 120) {
+      discountPct = 12
+      reason.push('120日超')
+    } else if (v.stagnation_days >= 90) {
+      discountPct = 10
+      reason.push('90日超')
+    } else if (v.stagnation_days >= 60) {
+      discountPct = 6
+      reason.push('60日超')
+    }
+
+    // CVR sensitivity (adds weight with traffic)
+    const views = v.detail_views || 0
+    if (v.cvr === 0 && views >= 30) {
+      discountPct = Math.max(discountPct, 12)
+      reason.push('CVR0(閲覧多)')
+    } else if (v.cvr < 0.5 && views >= 20) {
+      discountPct = Math.max(discountPct, 10)
+      reason.push('CVR極低(閲覧多)')
+    } else if (v.cvr < 1 && views >= 10) {
+      discountPct = Math.max(discountPct, 8)
+      reason.push('CVR低(閲覧有)')
+    } else if (v.cvr < 2 && v.cvr > 0) {
+      discountPct = Math.max(discountPct, 6)
+      reason.push('CVR低')
+    }
+
+    const currentPrice = v.price_body || 0
+    const suggestedPrice = Math.floor(currentPrice * (1 - discountPct / 100))
+    const discountAmount = currentPrice - suggestedPrice
+    return { discountPct, suggestedPrice, discountAmount, reason: reason.join(', ') }
+  }
+
+  const withSuggestions = discountCandidates.map((v: any) => {
+    const opt = suggestOptimization(v)
+    const ai = suggestAI(v)
     return {
       ...v,
-      discountPct,
-      currentPrice,
-      suggestedPrice,
-      discountAmount,
-      reason: reason.join(', ')
+      currentPrice: v.price_body || 0,
+      costPrice: v.cost_price ?? null,
+      discountPctOptimization: opt.discountPct,
+      suggestedPriceOptimization: opt.suggestedPrice,
+      discountAmountOptimization: opt.discountAmount,
+      reasonOptimization: opt.reason,
+      discountPctAI: ai.discountPct,
+      suggestedPriceAI: ai.suggestedPrice,
+      discountAmountAI: ai.discountAmount,
+      reasonAI: ai.reason,
     }
   })
 
@@ -77,7 +135,14 @@ async function getPricingData() {
 export default async function PricingOptimizationPage() {
   const { discountCandidates, priceHistories, total } = await getPricingData()
 
-  const totalPotentialSavings = discountCandidates.reduce((sum, v) => sum + v.discountAmount, 0)
+  const totalPotentialSavings = discountCandidates.reduce((sum, v: any) => sum + (v.discountAmountOptimization || 0), 0)
+
+  const guardrails = {
+    minPriceYen: parseInt(process.env.PRICING_MIN_PRICE_YEN || '0', 10) || 0,
+    minMarginYen: parseInt(process.env.PRICING_MIN_MARGIN_YEN || '0', 10) || 0,
+    maxDiscountPct: parseFloat(process.env.PRICING_MAX_DISCOUNT_PCT || '25') || 25,
+    maxDiscountYen: parseInt(process.env.PRICING_MAX_DISCOUNT_YEN || '500000', 10) || 500000,
+  }
 
   return (
     <div className="space-y-6">
@@ -138,72 +203,8 @@ export default async function PricingOptimizationPage() {
         </div>
 
         {discountCandidates.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">車両</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">現在価格</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">推奨値下げ</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">新価格</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">滞留日数</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CVR</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">理由</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {discountCandidates.map((vehicle) => (
-                  <tr key={vehicle.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {vehicle.maker} {vehicle.car_name}
-                      </div>
-                      <div className="text-xs text-gray-500">{vehicle.grade}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {formatPrice(vehicle.currentPrice)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-red-600">
-                        -{vehicle.discountPct}%
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {formatPrice(vehicle.discountAmount)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-green-600">
-                        {formatPrice(vehicle.suggestedPrice)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${getStagnationColor(vehicle.stagnation_days)}`}>
-                        {vehicle.stagnation_days}日
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr)}`}>
-                        {vehicle.cvr.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-xs text-gray-600">{vehicle.reason}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <Link
-                        href={`/admin/inventory/${vehicle.id}`}
-                        className="text-primary hover:text-primary/80"
-                      >
-                        編集
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-6">
+            <PricingBulkTable rows={discountCandidates as any} guardrails={guardrails} />
           </div>
         ) : (
           <div className="p-12 text-center">

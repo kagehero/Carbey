@@ -59,11 +59,16 @@ async function getDashboardStats() {
 
   // Stagnation distribution
   const stagnationBands = [
-    { label: '0-30日', min: 0, max: 30 },
+    { label: '0-15日', min: 0, max: 15 },
+    { label: '16-30日', min: 16, max: 30 },
     { label: '31-45日', min: 31, max: 45 },
     { label: '46-60日', min: 46, max: 60 },
-    { label: '61-180日', min: 61, max: 180 },
-    { label: '180日超', min: 181, max: Infinity },
+    { label: '61-90日', min: 61, max: 90 },
+    { label: '91-120日', min: 91, max: 120 },
+    { label: '121-180日', min: 121, max: 180 },
+    { label: '181-240日', min: 181, max: 240 },
+    { label: '241-365日', min: 241, max: 365 },
+    { label: '366日超', min: 366, max: Infinity },
   ]
 
   const distribution = stagnationBands.map(band => {

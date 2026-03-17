@@ -20,8 +20,12 @@ export default function StagnationChart({ data }: StagnationChartProps) {
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis 
             dataKey="name" 
-            tick={{ fontSize: 12 }}
+            tick={{ fontSize: 10 }}
             stroke="#6b7280"
+            interval={0}
+            angle={-30}
+            textAnchor="end"
+            height={60}
           />
           <YAxis 
             tick={{ fontSize: 12 }}
