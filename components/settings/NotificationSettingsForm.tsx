@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { NotificationSettings } from '@/types'
+import type { Database } from '@/types/database'
 
 type Props = {
   userId: string
@@ -32,18 +33,20 @@ export default function NotificationSettingsForm({ userId, initial }: Props) {
     setError(null)
     setSavedAt(null)
 
-    const { error: upsertError } = await supabase
+    const payload: Database['public']['Tables']['notification_settings']['Insert'] = {
+      user_id: userId,
+      email_enabled: emailEnabled,
+      stagnation_alert_enabled: stagnationAlertEnabled,
+      stagnation_threshold_days: stagnationThresholdDays,
+      price_change_enabled: priceChangeEnabled,
+    }
+
+    // NOTE: Supabase client generics occasionally fail to pick up newly-added tables
+    // in Next.js build environments; cast avoids a hard build error while preserving
+    // runtime correctness.
+    const { error: upsertError } = await (supabase as any)
       .from('notification_settings')
-      .upsert(
-        {
-          user_id: userId,
-          email_enabled: emailEnabled,
-          stagnation_alert_enabled: stagnationAlertEnabled,
-          stagnation_threshold_days: stagnationThresholdDays,
-          price_change_enabled: priceChangeEnabled,
-        },
-        { onConflict: 'user_id' }
-      )
+      .upsert(payload, { onConflict: 'user_id' })
 
     if (upsertError) {
       setError(upsertError.message)
