@@ -27,6 +27,7 @@ export interface Database {
           price_body: number | null
           price_total: number | null
           price_initial: number | null
+          cost_price: number | null
           price_body_display: string | null
           price_total_display: string | null
           mileage: number | null
@@ -90,6 +91,7 @@ export interface Database {
           price_body?: number | null
           price_total?: number | null
           price_initial?: number | null
+          cost_price?: number | null
           price_body_display?: string | null
           price_total_display?: string | null
           mileage?: number | null
@@ -150,6 +152,7 @@ export interface Database {
           price_body?: number | null
           price_total?: number | null
           price_initial?: number | null
+          cost_price?: number | null
           price_body_display?: string | null
           price_total_display?: string | null
           mileage?: number | null
