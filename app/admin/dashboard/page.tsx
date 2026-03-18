@@ -3,6 +3,7 @@ import StagnationChart from '@/components/analytics/StagnationChart'
 import PriorityTable from '@/components/analytics/PriorityTable'
 import DiscountCandidates from '@/components/analytics/DiscountCandidates'
 import DashboardStats from '@/components/analytics/DashboardStats'
+import DashboardAlerts from '@/components/analytics/DashboardAlerts'
 import { calculateStagnationDays, calculateCVR } from '@/lib/utils'
 import { Database } from '@/types/database'
 
@@ -56,6 +57,22 @@ async function getDashboardStats() {
     const cvr = calculateCVR(i.email_inquiries, i.detail_views)
     return days >= 60 || cvr < 2
   }).length || 0
+
+  // Alert counts for reminder panel
+  const onSaleVehicles = typedInventories.filter(i => i.status === '販売中' && i.published_date)
+  const stagnation180 = onSaleVehicles.filter(i => calculateStagnationDays(i.published_date!) >= 180).length
+  const stagnation90 = onSaleVehicles.filter(i => {
+    const d = calculateStagnationDays(i.published_date!)
+    return d >= 90 && d < 180
+  }).length
+  const stagnation60 = onSaleVehicles.filter(i => {
+    const d = calculateStagnationDays(i.published_date!)
+    return d >= 60 && d < 90
+  }).length
+  const lowCVR = onSaleVehicles.filter(i => {
+    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
+    return i.detail_views && i.detail_views > 0 && cvr > 0 && cvr < 2
+  }).length
 
   // Stagnation distribution
   const stagnationBands = [
@@ -113,15 +130,17 @@ async function getDashboardStats() {
     },
     distribution,
     priorityVehicles,
-    inventories: typedInventories
+    inventories: typedInventories,
+    alerts: { stagnation60, stagnation90, stagnation180, lowCVR, pricingCandidates: discountCount }
   }
 }
 
 export default async function DashboardPage() {
-  const { stats, distribution, priorityVehicles, inventories } = await getDashboardStats()
+  const { stats, distribution, priorityVehicles, inventories, alerts } = await getDashboardStats()
 
   return (
     <div className="space-y-6">
+      <DashboardAlerts {...alerts} />
       <DashboardStats initialStats={stats} />
 
       {/* Charts and Tables */}

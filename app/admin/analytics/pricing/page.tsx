@@ -3,6 +3,7 @@ import { calculateStagnationDays, calculateCVR, formatPrice, getStagnationColor,
 import { DollarSign, AlertCircle, TrendingDown, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import PricingBulkTable from '@/components/pricing/PricingBulkTable'
+import PriceListExportButton from '@/components/pricing/PriceListExportButton'
 
 async function getPricingData() {
   const supabase = await createClient()
@@ -144,11 +145,21 @@ export default async function PricingOptimizationPage() {
     maxDiscountYen: parseInt(process.env.PRICING_MAX_DISCOUNT_YEN || '500000', 10) || 500000,
   }
 
+  const generatedAt = new Date().toLocaleString('ja-JP', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
+  }).replace(/\//g, '').replace(/:/g, '').replace(' ', '_').replace(',', '')
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">価格最適化</h1>
-        <p className="text-gray-500 mt-1">価格見直しの提案と履歴</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">価格最適化</h1>
+          <p className="text-gray-500 mt-1">価格見直しの提案と履歴</p>
+        </div>
+        {discountCandidates.length > 0 && (
+          <PriceListExportButton rows={discountCandidates as any} generatedAt={generatedAt} />
+        )}
       </div>
 
       {/* Summary Cards */}

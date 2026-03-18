@@ -14,7 +14,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Menu,
-  X
+  X,
+  BarChart2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -40,6 +41,7 @@ const navigation = [
     icon: BarChart3,
     roles: ['admin', 'viewer'],
     children: [
+      { name: '統合分析', href: '/admin/analytics/integrated', icon: BarChart2 },
       { name: '滞留分析', href: '/admin/analytics/stagnation', icon: TrendingDown },
       { name: 'CVR分析', href: '/admin/analytics/cvr', icon: Percent },
       { name: '価格最適化', href: '/admin/analytics/pricing', icon: DollarSign },

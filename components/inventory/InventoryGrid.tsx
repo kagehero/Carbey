@@ -11,7 +11,31 @@ interface InventoryGridProps {
   inventories: Inventory[]
 }
 
-type SortOption = 'newest' | 'price-low' | 'price-high' | 'stagnation-low' | 'stagnation-high' | 'views-high' | 'cvr-high'
+type SortOption =
+  | 'newest'
+  | 'price-low' | 'price-high'
+  | 'stagnation-low' | 'stagnation-high'
+  | 'views-high' | 'views-low'
+  | 'cvr-high' | 'cvr-low'
+  | 'inquiries-high'
+  | 'priority'
+  | 'discount-opt' | 'discount-ai'
+
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: '新着順',
+  'price-low': '価格（安い順）',
+  'price-high': '価格（高い順）',
+  'stagnation-low': '在庫日数（少ない順）',
+  'stagnation-high': '在庫日数（多い順）',
+  'views-high': '閲覧数（多い順）',
+  'views-low': '閲覧数（少ない順）',
+  'cvr-high': 'CVR（高い順）',
+  'cvr-low': 'CVR（低い順）— 要改善',
+  'inquiries-high': '問い合わせ数（多い順）',
+  priority: '優先度スコア（高い順）',
+  'discount-opt': '推奨値下げ額（大きい順）',
+  'discount-ai': 'AI推奨割引率（大きい順）',
+}
 
 export default function InventoryGrid({ inventories }: InventoryGridProps) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -26,15 +50,45 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
   )
   const [makerFilter, setMakerFilter] = useState<string>('all')
 
-  // Calculate stagnation for each vehicle
+  // Calculate stagnation, CVR and derived analytics for each vehicle
   const vehiclesWithData = useMemo(() => {
-    return inventories.map(inv => ({
-      ...inv,
-      stagnation_days: calculateStagnationDays(inv.published_date),
-      cvr: inv.detail_views && inv.detail_views > 0 
-        ? ((inv.email_inquiries || 0) / inv.detail_views) * 100 
-        : 0
-    }))
+    return inventories.map(inv => {
+      const stagnation_days = calculateStagnationDays(inv.published_date)
+      const views = inv.detail_views || 0
+      const cvr = views > 0 ? ((inv.email_inquiries || 0) / views) * 100 : 0
+      const priority = stagnation_days * 1.0 + (5 - Math.min(cvr, 5)) * 10.0
+
+      // Optimization discount suggestion (mirrors pricing page logic)
+      let optPct = 0
+      if (stagnation_days >= 180) optPct = 15
+      else if (stagnation_days >= 90) optPct = 10
+      else if (stagnation_days >= 60) optPct = 5
+      if (cvr < 1 && views > 10) optPct = Math.max(optPct, 10)
+      else if (cvr < 2 && cvr > 0) optPct = Math.max(optPct, 5)
+      const discountAmountOpt = Math.floor((inv.price_body || 0) * optPct / 100)
+
+      // AI discount suggestion
+      let aiPct = 0
+      if (stagnation_days >= 365) aiPct = 20
+      else if (stagnation_days >= 240) aiPct = 18
+      else if (stagnation_days >= 180) aiPct = 15
+      else if (stagnation_days >= 120) aiPct = 12
+      else if (stagnation_days >= 90) aiPct = 10
+      else if (stagnation_days >= 60) aiPct = 6
+      if (cvr === 0 && views >= 30) aiPct = Math.max(aiPct, 12)
+      else if (cvr < 0.5 && views >= 20) aiPct = Math.max(aiPct, 10)
+      else if (cvr < 1 && views >= 10) aiPct = Math.max(aiPct, 8)
+      else if (cvr < 2 && cvr > 0) aiPct = Math.max(aiPct, 6)
+
+      return {
+        ...inv,
+        stagnation_days,
+        cvr,
+        priority,
+        discountAmountOpt,
+        aiPct,
+      }
+    })
   }, [inventories])
 
   // Filter
@@ -65,12 +119,9 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
   // Sort
   const sorted = useMemo(() => {
     const items = [...filtered]
-    
-    switch(sortBy) {
+    switch (sortBy) {
       case 'newest':
-        return items.sort((a, b) => 
-          new Date(b.inserted_at || 0).getTime() - new Date(a.inserted_at || 0).getTime()
-        )
+        return items.sort((a, b) => new Date(b.inserted_at || 0).getTime() - new Date(a.inserted_at || 0).getTime())
       case 'price-low':
         return items.sort((a, b) => (a.price_body || 0) - (b.price_body || 0))
       case 'price-high':
@@ -81,8 +132,27 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
         return items.sort((a, b) => b.stagnation_days - a.stagnation_days)
       case 'views-high':
         return items.sort((a, b) => (b.detail_views || 0) - (a.detail_views || 0))
+      case 'views-low':
+        return items.sort((a, b) => (a.detail_views || 0) - (b.detail_views || 0))
       case 'cvr-high':
         return items.sort((a, b) => b.cvr - a.cvr)
+      case 'cvr-low':
+        // Only vehicles with actual views; no-view vehicles go to the end
+        return items.sort((a, b) => {
+          const aHas = (a.detail_views || 0) > 0
+          const bHas = (b.detail_views || 0) > 0
+          if (aHas && !bHas) return -1
+          if (!aHas && bHas) return 1
+          return a.cvr - b.cvr
+        })
+      case 'inquiries-high':
+        return items.sort((a, b) => (b.email_inquiries || 0) - (a.email_inquiries || 0))
+      case 'priority':
+        return items.sort((a, b) => b.priority - a.priority)
+      case 'discount-opt':
+        return items.sort((a, b) => b.discountAmountOpt - a.discountAmountOpt)
+      case 'discount-ai':
+        return items.sort((a, b) => b.aiPct - a.aiPct)
       default:
         return items
     }
@@ -113,6 +183,35 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+
+          {/* Sort always visible */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+          >
+            <optgroup label="基本">
+              <option value="newest">新着順</option>
+            </optgroup>
+            <optgroup label="在庫日数">
+              <option value="stagnation-high">在庫日数（多い順）</option>
+              <option value="stagnation-low">在庫日数（少ない順）</option>
+            </optgroup>
+            <optgroup label="価格">
+              <option value="price-high">価格（高い順）</option>
+              <option value="price-low">価格（安い順）</option>
+            </optgroup>
+            <optgroup label="分析連動">
+              <option value="priority">優先度スコア（高い順）</option>
+              <option value="cvr-low">CVR（低い順）— 要改善</option>
+              <option value="cvr-high">CVR（高い順）</option>
+              <option value="inquiries-high">問い合わせ数（多い順）</option>
+              <option value="views-high">閲覧数（多い順）</option>
+              <option value="views-low">閲覧数（少ない順）</option>
+              <option value="discount-opt">推奨値下げ額（大きい順）</option>
+              <option value="discount-ai">AI推奨割引率（大きい順）</option>
+            </optgroup>
+          </select>
 
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -190,25 +289,6 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <ArrowUpDown className="w-4 h-4 inline mr-1" />
-                並び替え
-              </label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="newest">新着順</option>
-                <option value="stagnation-low">在庫日数（少ない順）</option>
-                <option value="stagnation-high">在庫日数（多い順）</option>
-                <option value="price-low">価格（安い順）</option>
-                <option value="price-high">価格（高い順）</option>
-                <option value="views-high">閲覧数（多い順）</option>
-                <option value="cvr-high">CVR（高い順）</option>
-              </select>
-            </div>
           </div>
         )}
 
@@ -230,16 +310,8 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
               ✗ 在庫なし: {inventories.filter(v => v.stock_status === 'なし').length}台
             </span>
           </div>
-          <span className="text-gray-500">
-            並び替え: {
-              sortBy === 'newest' ? '新着順' :
-              sortBy === 'price-low' ? '価格（安い順）' :
-              sortBy === 'price-high' ? '価格（高い順）' :
-              sortBy === 'stagnation-low' ? '在庫日数（少ない順）' :
-              sortBy === 'stagnation-high' ? '在庫日数（多い順）' :
-              sortBy === 'views-high' ? '閲覧数順' :
-              'CVR順'
-            }
+          <span className="text-gray-500 text-xs">
+            並び替え: {SORT_LABELS[sortBy]}
           </span>
         </div>
       </div>
