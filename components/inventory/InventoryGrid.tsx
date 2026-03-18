@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Inventory } from '@/types'
 import { formatPrice, formatMileage, calculateStagnationDays, getStagnationColor } from '@/lib/utils'
-import { Search, SlidersHorizontal, ArrowUpDown, Eye, Calendar, Gauge, DollarSign } from 'lucide-react'
+import { Search, SlidersHorizontal, ArrowUpDown, Eye } from 'lucide-react'
+import { Calendar, Gauge, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import StatusChangeDropdown from './StatusChangeDropdown'
 
 interface InventoryGridProps {
@@ -158,6 +159,19 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
     }
   }, [filtered, sortBy])
 
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
+
+  // Reset to page 1 whenever filters/sort change
+  useEffect(() => { setPage(1) }, [searchTerm, statusFilter, publicationFilter, stockFilter, makerFilter, sortBy, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const paginated = useMemo(
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize]
+  )
+
   // Get stagnation badge color and label
   const getStagnationBadge = (days: number) => {
     if (days === 0) return { color: 'bg-gray-100 text-gray-600 border-gray-200', label: '未掲載', icon: '⚪' }
@@ -172,6 +186,7 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
     <div className="space-y-4">
       {/* Search and Filters */}
       <div className="bg-white rounded-lg border p-4 space-y-4">
+
         <div className="flex gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -295,7 +310,9 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
         <div className="flex items-center justify-between text-sm flex-wrap gap-2">
           <div className="flex items-center gap-4 flex-wrap">
             <span className="text-gray-600 font-medium">
-              {sorted.length}台 / 全{inventories.length}台
+              {sorted.length > 0
+                ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, sorted.length)}台目 / 絞込${sorted.length}台（全${inventories.length}台）`
+                : `0台 / 全${inventories.length}台`}
             </span>
             <span className="text-blue-600">
               📢 掲載: {inventories.filter(v => v.publication_status === '掲載').length}台
@@ -310,15 +327,90 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
               ✗ 在庫なし: {inventories.filter(v => v.stock_status === 'なし').length}台
             </span>
           </div>
-          <span className="text-gray-500 text-xs">
-            並び替え: {SORT_LABELS[sortBy]}
-          </span>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span>表示数:</span>
+            <select
+              value={pageSize}
+              onChange={e => setPageSize(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-xs"
+            >
+              <option value={12}>12台</option>
+              <option value={24}>24台</option>
+              <option value={48}>48台</option>
+              <option value={96}>96台</option>
+            </select>
+            <span>並び: {SORT_LABELS[sortBy]}</span>
+          </div>
         </div>
+
+         {/* Legend */}
+      <div className="bg-white rounded-lg border p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">掲載状態</h3>
+            <div className="flex gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-blue-500"></div>
+                <span>📢 掲載中 - カーセンサーに公開中</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-gray-500"></div>
+                <span>📋 非掲載 - 在庫のみ管理</span>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">在庫有無</h3>
+            <div className="flex gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-green-600"></div>
+                <span>✓ 在庫あり - 実在庫保有</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-red-600"></div>
+                <span>✗ 在庫なし - 取り寄せ等</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">滞留日数の色分け</h3>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+              <span>未掲載</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-green-500"></div>
+              <span>0-30日 (新着)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>31-60日 (注視)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+              <span>61-90日 (注意)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span>91-180日 (警告)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+              <span>181日以上 (緊急)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       </div>
 
       {/* Grid View - E-commerce Style */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {sorted.map((vehicle) => {
+        {paginated.map((vehicle) => {
           const stagnationBadge = getStagnationBadge(vehicle.stagnation_days)
           
           return (
@@ -459,68 +551,85 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
         </div>
       )}
 
-      {/* Legend */}
-      <div className="bg-white rounded-lg border p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">掲載状態</h3>
-            <div className="flex gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-blue-500"></div>
-                <span>📢 掲載中 - カーセンサーに公開中</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-gray-500"></div>
-                <span>📋 非掲載 - 在庫のみ管理</span>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">在庫有無</h3>
-            <div className="flex gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-green-600"></div>
-                <span>✓ 在庫あり - 実在庫保有</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-red-600"></div>
-                <span>✗ 在庫なし - 取り寄せ等</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="bg-white rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gray-600">
+            <span className="font-medium">{(page - 1) * pageSize + 1}</span>〜
+            <span className="font-medium">{Math.min(page * pageSize, sorted.length)}</span>台目 ／ 全
+            <span className="font-medium">{sorted.length}</span>台（
+            {page} / {totalPages}ページ）
+          </p>
 
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">滞留日数の色分け</h3>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-              <span>未掲載</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span>0-30日 (新着)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span>31-60日 (注視)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-              <span>61-90日 (注意)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span>91-180日 (警告)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-              <span>181日以上 (緊急)</span>
-            </div>
+          <div className="flex items-center gap-1">
+            {/* First */}
+            <button
+              onClick={() => setPage(1)}
+              disabled={page === 1}
+              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
+              title="最初のページ"
+            >
+              <ChevronsLeft className="w-4 h-4 text-gray-600" />
+            </button>
+            {/* Prev */}
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
+              title="前のページ"
+            >
+              <ChevronLeft className="w-4 h-4 text-gray-600" />
+            </button>
+
+            {/* Page numbers */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
+                acc.push(p)
+                return acc
+              }, [])
+              .map((item, idx) =>
+                item === 'ellipsis' ? (
+                  <span key={`e${idx}`} className="px-2 text-gray-400 text-sm">…</span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setPage(item as number)}
+                    className={`min-w-[32px] h-8 px-2 rounded border text-sm font-medium transition-colors ${
+                      page === item
+                        ? 'bg-blue-600 border-blue-600 text-white'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+
+            {/* Next */}
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
+              title="次のページ"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-600" />
+            </button>
+            {/* Last */}
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={page === totalPages}
+              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
+              title="最後のページ"
+            >
+              <ChevronsRight className="w-4 h-4 text-gray-600" />
+            </button>
           </div>
         </div>
-      </div>
+      )}
+
+     
     </div>
   )
 }
