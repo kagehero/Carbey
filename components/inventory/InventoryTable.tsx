@@ -13,6 +13,8 @@ interface InventoryTableProps {
 export default function InventoryTable({ inventories }: InventoryTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+   const makers = Array.from(new Set(inventories.map((inv) => inv.maker).filter((m): m is string => !!m))).sort()
+   const [makerFilter, setMakerFilter] = useState<string>('all')
 
   const filtered = inventories.filter(inv => {
     const matchesSearch = 
@@ -24,7 +26,10 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
     const matchesStatus = 
       statusFilter === 'all' || inv.status === statusFilter
 
-    return matchesSearch && matchesStatus
+    const matchesMaker =
+      makerFilter === 'all' || inv.maker === makerFilter
+
+    return matchesSearch && matchesStatus && matchesMaker
   })
 
   return (
@@ -43,16 +48,30 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
             />
           </div>
 
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-          >
-            <option value="all">全てのステータス</option>
-            <option value="販売中">販売中</option>
-            <option value="売約済">売約済</option>
-            <option value="非公開">非公開</option>
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="all">全てのステータス</option>
+              <option value="販売中">販売中</option>
+              <option value="売約済">売約済</option>
+              <option value="非公開">非公開</option>
+            </select>
+            <select
+              value={makerFilter}
+              onChange={(e) => setMakerFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="all">全てのメーカー</option>
+              {makers.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="text-sm text-gray-500">
