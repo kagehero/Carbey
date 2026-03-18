@@ -26,6 +26,12 @@ type Props = {
 export default function CVRPoorBulkTable({ rows }: Props) {
   const supabase = useMemo(() => createClient(), [])
 
+  const makers = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.maker).filter((m): m is string => !!m))).sort(),
+    [rows]
+  )
+
+  const [makerFilter, setMakerFilter] = useState<string>("all")
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,8 +42,13 @@ export default function CVRPoorBulkTable({ rows }: Props) {
 
   const [priceModal, setPriceModal] = useState<{ id: string; currentPrice: number } | null>(null)
 
+  const filteredRows = useMemo(
+    () => (makerFilter === "all" ? rows : rows.filter((r) => r.maker === makerFilter)),
+    [rows, makerFilter]
+  )
+
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected])
-  const allSelected = selectedIds.length > 0 && selectedIds.length === rows.length
+  const allSelected = selectedIds.length > 0 && selectedIds.length === filteredRows.length
 
   const toggleAll = () => {
     if (allSelected) {
@@ -57,7 +68,7 @@ export default function CVRPoorBulkTable({ rows }: Props) {
 
     const delta = Math.trunc(deltaMan * 10000)
     for (const id of selectedIds) {
-      const row = rows.find((r) => r.id === id)
+      const row = filteredRows.find((r) => r.id === id)
       if (!row) continue
       const current = row.price_body || 0
       const next = current + delta
@@ -104,8 +115,26 @@ export default function CVRPoorBulkTable({ rows }: Props) {
     <div className="space-y-4">
       {/* First-view bulk bar */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-        <div className="text-sm text-gray-600">
-          選択中: <span className="font-medium text-gray-900">{selectedIds.length}</span>件
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-sm text-gray-600">
+            選択中: <span className="font-medium text-gray-900">{selectedIds.length}</span>件
+          </div>
+          <select
+            className="px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+            value={makerFilter}
+            onChange={(e) => {
+              setMakerFilter(e.target.value)
+              setSelected({})
+            }}
+            disabled={busy}
+          >
+            <option value="all">すべてのメーカー</option>
+            {makers.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -113,7 +142,7 @@ export default function CVRPoorBulkTable({ rows }: Props) {
             type="button"
             className="px-3 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50 disabled:opacity-50"
             onClick={toggleAll}
-            disabled={busy || rows.length === 0}
+            disabled={busy || filteredRows.length === 0}
           >
             {allSelected ? "選択解除" : "全選択"}
           </button>
@@ -194,7 +223,7 @@ export default function CVRPoorBulkTable({ rows }: Props) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {rows.map((vehicle) => (
+            {filteredRows.map((vehicle) => (
               <tr key={vehicle.id} className="hover:bg-gray-50">
                 <td className="px-4 py-4">
                   <input

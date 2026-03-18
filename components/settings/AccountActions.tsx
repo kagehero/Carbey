@@ -30,31 +30,6 @@ export default function AccountActions() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const deleteAccount = async () => {
-    const ok = window.confirm(
-      'アカウント削除を実行します。この操作は取り消せません。\n\n削除されるのはログイン用アカウントとプロフィールです。在庫データは削除しません。'
-    )
-    if (!ok) return
-
-    setBusy(true)
-    setError(null)
-
-    const resp = await fetch('/api/account/delete', { method: 'POST' })
-    const body = await resp.json().catch(() => null)
-
-    if (!resp.ok) {
-      setError(body?.error || body?.message || '削除に失敗しました')
-      setBusy(false)
-      return
-    }
-
-    try {
-      await supabase.auth.signOut()
-    } finally {
-      window.location.href = '/login'
-    }
-  }
-
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <div className="flex items-center gap-3 mb-4">
@@ -74,13 +49,6 @@ export default function AccountActions() {
           className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700 disabled:opacity-50"
         >
           通知設定
-        </button>
-        <button
-          onClick={deleteAccount}
-          disabled={busy}
-          className="px-4 py-3 border border-red-300 rounded-lg hover:bg-red-50 transition-colors text-sm font-medium text-red-600 disabled:opacity-50"
-        >
-          アカウント削除
         </button>
       </div>
       {error ? <p className="text-sm text-red-600 mt-4">{error}</p> : null}

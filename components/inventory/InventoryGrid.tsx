@@ -20,6 +20,11 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
   const [stockFilter, setStockFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [showFilters, setShowFilters] = useState(false)
+  const makers = useMemo(
+    () => Array.from(new Set(inventories.map((inv) => inv.maker).filter((m): m is string => !!m))).sort(),
+    [inventories]
+  )
+  const [makerFilter, setMakerFilter] = useState<string>('all')
 
   // Calculate stagnation for each vehicle
   const vehiclesWithData = useMemo(() => {
@@ -50,9 +55,12 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
       const matchesStock = 
         stockFilter === 'all' || inv.stock_status === stockFilter
 
-      return matchesSearch && matchesStatus && matchesPublication && matchesStock
+      const matchesMaker =
+        makerFilter === 'all' || inv.maker === makerFilter
+
+      return matchesSearch && matchesStatus && matchesPublication && matchesStock && matchesMaker
     })
-  }, [vehiclesWithData, searchTerm, statusFilter, publicationFilter, stockFilter])
+  }, [vehiclesWithData, searchTerm, statusFilter, publicationFilter, stockFilter, makerFilter])
 
   // Sort
   const sorted = useMemo(() => {
@@ -161,6 +169,24 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
                 <option value="販売中">販売中</option>
                 <option value="売約済">売約済</option>
                 <option value="非公開">非公開</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                メーカー
+              </label>
+              <select
+                value={makerFilter}
+                onChange={(e) => setMakerFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">全てのメーカー</option>
+                {makers.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
               </select>
             </div>
 

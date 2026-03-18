@@ -49,6 +49,7 @@ function clampSuggestedPrice(current: number, suggested: number, g: Guardrails, 
 export default function PricingBulkTable({ rows, guardrails }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [mode, setMode] = useState<PricingMode>("optimization")
+  const [makerFilter, setMakerFilter] = useState<string>("all")
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,8 +57,18 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
 
   const [deltaMan, setDeltaMan] = useState<number>(-5) // default -5万円
 
+  const makers = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.maker).filter((m): m is string => !!m))).sort(),
+    [rows]
+  )
+
+  const filteredRows = useMemo(
+    () => (makerFilter === "all" ? rows : rows.filter((r) => r.maker === makerFilter)),
+    [rows, makerFilter]
+  )
+
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected])
-  const allSelected = selectedIds.length > 0 && selectedIds.length === rows.length
+  const allSelected = selectedIds.length > 0 && selectedIds.length === filteredRows.length
 
   const getSuggestedForMode = (r: PricingRow) => {
     if (mode === "ai") {
@@ -78,7 +89,7 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
 
   const preview = useMemo(() => {
     const ids = selectedIds.length ? selectedIds : []
-    const targetRows = ids.length ? rows.filter((r) => ids.includes(r.id)) : []
+    const targetRows = ids.length ? filteredRows.filter((r) => ids.includes(r.id)) : []
     if (!targetRows.length) return null
 
     const changes = targetRows.map((r) => {
@@ -98,7 +109,7 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
       return
     }
     const next: Record<string, boolean> = {}
-    for (const r of rows) next[r.id] = true
+    for (const r of filteredRows) next[r.id] = true
     setSelected(next)
   }
 
@@ -108,7 +119,7 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
     setError(null)
     setNotice(null)
 
-    const updates = rows
+    const updates = filteredRows
       .filter((r) => selectedIds.includes(r.id))
       .map((r) => {
         const s = getSuggestedForMode(r)
@@ -142,7 +153,7 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
     setNotice(null)
 
     const delta = Math.trunc(deltaMan * 10000)
-    const updates = rows
+    const updates = filteredRows
       .filter((r) => selectedIds.includes(r.id))
       .map((r) => {
         const proposed = r.currentPrice + delta
@@ -197,6 +208,23 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+            value={makerFilter}
+            onChange={(e) => {
+              setMakerFilter(e.target.value)
+              setSelected({})
+            }}
+            disabled={busy}
+          >
+            <option value="all">すべてのメーカー</option>
+            {makers.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+
           <button
             type="button"
             className="px-3 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50 disabled:opacity-50"
