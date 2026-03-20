@@ -1,15 +1,26 @@
 'use client'
 
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { formatPrice, calculateStagnationDays, calculateCVR } from '@/lib/utils'
 import { AlertTriangle, ExternalLink } from 'lucide-react'
 import { Inventory } from '@/types'
+import TablePagination from '@/components/ui/TablePagination'
 
 interface DiscountCandidatesProps {
   vehicles: Inventory[]
 }
 
 export default function DiscountCandidates({ vehicles }: DiscountCandidatesProps) {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
+  useEffect(() => setPage(1), [pageSize, vehicles.length])
+  const totalPages = Math.max(1, Math.ceil(vehicles.length / pageSize))
+  const paginated = useMemo(
+    () => vehicles.slice((page - 1) * pageSize, page * pageSize),
+    [vehicles, page, pageSize]
+  )
+
   if (vehicles.length === 0) {
     return (
       <div className="p-6 text-center text-gray-500">
@@ -19,6 +30,7 @@ export default function DiscountCandidates({ vehicles }: DiscountCandidatesProps
   }
 
   return (
+    <div className="space-y-4">
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-gray-50 border-b border-gray-200">
@@ -44,7 +56,7 @@ export default function DiscountCandidates({ vehicles }: DiscountCandidatesProps
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {vehicles.slice(0, 20).map((vehicle) => {
+          {paginated.map((vehicle) => {
             const stagnation = calculateStagnationDays(vehicle.published_date!)
             const cvr = calculateCVR(vehicle.email_inquiries, vehicle.detail_views)
             const reasons = []
@@ -97,17 +109,19 @@ export default function DiscountCandidates({ vehicles }: DiscountCandidatesProps
           })}
         </tbody>
       </table>
+    </div>
 
-      {vehicles.length > 20 && (
-        <div className="p-4 text-center border-t border-gray-200">
-          <Link
-            href="/admin/analytics/pricing"
-            className="text-sm text-primary hover:text-primary/80 font-medium"
-          >
-            すべて表示 ({vehicles.length}台) →
-          </Link>
-        </div>
-      )}
+    {totalPages > 1 && (
+      <TablePagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={vehicles.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+        unitLabel="台"
+      />
+    )}
     </div>
   )
 }

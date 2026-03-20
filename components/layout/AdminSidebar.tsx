@@ -15,7 +15,8 @@ import {
   ChevronLeft,
   Menu,
   X,
-  BarChart2
+  BarChart2,
+  Sparkles
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -42,6 +43,7 @@ const navigation = [
     roles: ['admin', 'viewer'],
     children: [
       { name: '統合分析', href: '/admin/analytics/integrated', icon: BarChart2 },
+      { name: 'AI分析', href: '/admin/analytics/ai', icon: Sparkles, tag: 'AI' },
       { name: '滞留分析', href: '/admin/analytics/stagnation', icon: TrendingDown },
       { name: 'CVR分析', href: '/admin/analytics/cvr', icon: Percent },
       { name: '価格最適化', href: '/admin/analytics/pricing', icon: DollarSign },
@@ -173,6 +175,7 @@ export default function AdminSidebar({ userRole }: AdminSidebarProps) {
                     >
                       {item.children.map((child) => {
                         const isActive = pathname === child.href
+                        const childWithTag = child as typeof child & { tag?: string }
                         return (
                           <Link
                             key={child.href}
@@ -187,6 +190,18 @@ export default function AdminSidebar({ userRole }: AdminSidebarProps) {
                           >
                             <child.icon className="w-4 h-4 mr-2" />
                             {child.name}
+                            {childWithTag.tag && (
+                              <span
+                                className={cn(
+                                  'ml-auto text-[10px] px-1.5 py-0.5 rounded font-medium',
+                                  isActive
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-indigo-100 text-indigo-600'
+                                )}
+                              >
+                                {childWithTag.tag}
+                              </span>
+                            )}
                           </Link>
                         )
                       })}

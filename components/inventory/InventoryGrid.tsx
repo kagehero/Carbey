@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Inventory } from '@/types'
 import { formatPrice, formatMileage, calculateStagnationDays, getStagnationColor } from '@/lib/utils'
 import { Search, SlidersHorizontal, ArrowUpDown, Eye } from 'lucide-react'
-import { Calendar, Gauge, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Calendar, Gauge } from 'lucide-react'
+import TablePagination from '@/components/ui/TablePagination'
 import StatusChangeDropdown from './StatusChangeDropdown'
 
 interface InventoryGridProps {
@@ -566,82 +567,16 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div className="bg-white rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-gray-600">
-            <span className="font-medium">{(page - 1) * pageSize + 1}</span>〜
-            <span className="font-medium">{Math.min(page * pageSize, sorted.length)}</span>台目 ／ 全
-            <span className="font-medium">{sorted.length}</span>台（
-            {page} / {totalPages}ページ）
-          </p>
-
-          <div className="flex items-center gap-1">
-            {/* First */}
-            <button
-              onClick={() => setPage(1)}
-              disabled={page === 1}
-              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
-              title="最初のページ"
-            >
-              <ChevronsLeft className="w-4 h-4 text-gray-600" />
-            </button>
-            {/* Prev */}
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
-              title="前のページ"
-            >
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
-            </button>
-
-            {/* Page numbers */}
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-              .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
-                acc.push(p)
-                return acc
-              }, [])
-              .map((item, idx) =>
-                item === 'ellipsis' ? (
-                  <span key={`e${idx}`} className="px-2 text-gray-400 text-sm">…</span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => setPage(item as number)}
-                    className={`min-w-[32px] h-8 px-2 rounded border text-sm font-medium transition-colors ${
-                      page === item
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-
-            {/* Next */}
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
-              title="次のページ"
-            >
-              <ChevronRight className="w-4 h-4 text-gray-600" />
-            </button>
-            {/* Last */}
-            <button
-              onClick={() => setPage(totalPages)}
-              disabled={page === totalPages}
-              className="p-1.5 rounded border border-gray-300 disabled:opacity-30 hover:bg-gray-50 disabled:cursor-not-allowed"
-              title="最後のページ"
-            >
-              <ChevronsRight className="w-4 h-4 text-gray-600" />
-            </button>
-          </div>
-        </div>
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={sorted.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+          unitLabel="台"
+        />
       )}
 
      

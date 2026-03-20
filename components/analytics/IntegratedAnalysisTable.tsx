@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
-import { ArrowUpDown, Search, Filter } from "lucide-react"
+import { ArrowUpDown, Search } from "lucide-react"
+import TablePagination from "@/components/ui/TablePagination"
 
 type VehicleRow = {
   id: string
@@ -78,6 +79,15 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
     })
   }, [vehicles, search, makerFilter, stagnationFilter, sortKey, sortAsc])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
+  useEffect(() => setPage(1), [search, makerFilter, stagnationFilter, sortKey, sortAsc, pageSize])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize]
+  )
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(p => !p)
     else { setSortKey(key); setSortAsc(false) }
@@ -125,7 +135,11 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
           <option value="90">90日以上</option>
           <option value="180">180日以上</option>
         </select>
-        <span className="text-sm text-gray-500 ml-auto">{filtered.length}台表示</span>
+        <span className="text-sm text-gray-500 ml-auto">
+          {paginated.length > 0
+            ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, filtered.length)}台目 / 全${filtered.length}台`
+            : `${filtered.length}台`}
+        </span>
       </div>
 
       {/* Table */}
@@ -156,7 +170,7 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map(v => (
+            {paginated.map(v => (
               <tr key={v.id} className="hover:bg-gray-50">
                 {/* Vehicle name */}
                 <td className="px-4 py-3 sticky left-0 bg-white hover:bg-gray-50 min-w-[200px]">
@@ -261,6 +275,20 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={filtered.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+            unitLabel="台"
+          />
+        </div>
+      )}
     </div>
   )
 }

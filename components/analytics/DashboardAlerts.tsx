@@ -99,15 +99,15 @@ export default function DashboardAlerts({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">本日の確認事項</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{today}</p>
+          <h2 className="text-base font-semibold text-slate-800">本日の確認事項</h2>
+          <p className="text-xs text-slate-400 mt-0.5">{today}</p>
         </div>
         <Link
           href="/admin/analytics/integrated"
-          className="text-sm text-blue-600 hover:underline font-medium"
+          className="text-sm text-sky-600 hover:text-sky-700 hover:underline font-medium transition-colors"
         >
           統合分析ビュー →
         </Link>
@@ -120,7 +120,7 @@ export default function DashboardAlerts({
             <Link
               key={a.label}
               href={a.href}
-              className={`rounded-lg p-4 flex flex-col gap-1 hover:opacity-80 transition-opacity ${style.card}`}
+              className={`rounded-xl p-4 flex flex-col gap-1 hover:opacity-90 transition-opacity ${style.card}`}
             >
               <div className="flex items-center justify-between">
                 <a.icon className={`w-4 h-4 ${style.icon}`} />

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Inventory } from '@/types'
 import { formatPrice, formatMileage, calculateStagnationDays, getStagnationColor, getNoStagnationReason } from '@/lib/utils'
 import { Edit, Eye, Search, AlertCircle, ArrowUpDown } from 'lucide-react'
+import TablePagination from '@/components/ui/TablePagination'
 
 interface InventoryTableProps {
   inventories: Inventory[]
@@ -115,6 +116,15 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
     }
   }, [filtered, sortBy])
 
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
+  useEffect(() => setPage(1), [searchTerm, statusFilter, makerFilter, sortBy, pageSize])
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize))
+  const paginated = useMemo(
+    () => sorted.slice((page - 1) * pageSize, page * pageSize),
+    [sorted, page, pageSize]
+  )
+
   return (
     <div>
       {/* Filters */}
@@ -183,7 +193,9 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
         </div>
 
         <div className="text-sm text-gray-500">
-          {sorted.length}台 / 全{inventories.length}台
+          {paginated.length > 0
+            ? `${(page - 1) * pageSize + 1}〜${Math.min(page * pageSize, sorted.length)}台目 / 絞込${sorted.length}台（全${inventories.length}台）`
+            : `0台 / 全${inventories.length}台`}
         </div>
       </div>
 
@@ -219,7 +231,7 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {sorted.map((inventory) => {
+            {paginated.map((inventory) => {
               const stagnation = inventory.published_date ? inventory.stagnation_days : null
               const noStagnationReason = getNoStagnationReason(
                 inventory.published_date,
@@ -327,6 +339,20 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
           </div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={sorted.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+            unitLabel="台"
+          />
+        </div>
+      )}
     </div>
   )
 }

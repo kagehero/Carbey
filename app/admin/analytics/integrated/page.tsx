@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { calculateStagnationDays, calculateCVR, formatPrice } from '@/lib/utils'
+import { computeAIForecast } from '@/lib/aiForecast'
 import IntegratedAnalysisTable from '@/components/analytics/IntegratedAnalysisTable'
+import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
 import Link from 'next/link'
 import { BarChart2 } from 'lucide-react'
 
@@ -54,6 +56,7 @@ async function getIntegratedData() {
       year: v.year,
       mileage: v.mileage,
       color: v.color,
+      status: v.status || '販売中',
       stagnation_days,
       cvr,
       detail_views: v.detail_views || 0,
@@ -71,11 +74,13 @@ async function getIntegratedData() {
     }
   }).sort((a, b) => b.stagnation_days - a.stagnation_days)
 
-  return { vehicles }
+  const forecast = computeAIForecast(vehicles)
+
+  return { vehicles, forecast }
 }
 
 export default async function IntegratedAnalysisPage() {
-  const { vehicles } = await getIntegratedData()
+  const { vehicles, forecast } = await getIntegratedData()
 
   const urgentCount = vehicles.filter(v => v.stagnation_days >= 180).length
   const warnCount = vehicles.filter(v => v.stagnation_days >= 60 && v.stagnation_days < 180).length
@@ -93,6 +98,9 @@ export default async function IntegratedAnalysisPage() {
           </p>
         </div>
       </div>
+
+      {/* AI分析・将来予測 */}
+      <AIAnalysisForecast forecast={forecast} />
 
       {/* Quick summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
