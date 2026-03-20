@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
-    "python:sync": "cd python && python carbey.py sync",
-    "python:view": "cd python && python carbey.py view",
-    "python:install": "pip install -r requirements.txt"
+    "python:sync": "cd python && ../.venv/bin/python carbey.py sync",
+    "python:view": "cd python && ../.venv/bin/python carbey.py view",
+    "python:install": "python3 -m venv .venv && .venv/bin/python -m ensurepip --upgrade && .venv/bin/python -m pip install -r requirements.txt && .venv/bin/playwright install chromium"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",

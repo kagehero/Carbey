@@ -1,8 +1,10 @@
 'use client'
 
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { formatPrice, getStagnationColor, getCVRColor } from '@/lib/utils'
 import { ExternalLink } from 'lucide-react'
+import TablePagination from '@/components/ui/TablePagination'
 
 interface Vehicle {
   id: string
@@ -19,6 +21,15 @@ interface PriorityTableProps {
 }
 
 export default function PriorityTable({ vehicles }: PriorityTableProps) {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
+  useEffect(() => setPage(1), [pageSize, vehicles.length])
+  const totalPages = Math.max(1, Math.ceil(vehicles.length / pageSize))
+  const paginated = useMemo(
+    () => vehicles.slice((page - 1) * pageSize, page * pageSize),
+    [vehicles, page, pageSize]
+  )
+
   if (vehicles.length === 0) {
     return (
       <div className="p-6 text-center text-gray-500">
@@ -28,6 +39,7 @@ export default function PriorityTable({ vehicles }: PriorityTableProps) {
   }
 
   return (
+    <div className="space-y-4">
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-gray-50 border-b border-gray-200">
@@ -56,11 +68,11 @@ export default function PriorityTable({ vehicles }: PriorityTableProps) {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {vehicles.map((vehicle, index) => (
+          {paginated.map((vehicle, idx) => (
             <tr key={vehicle.id} className="hover:bg-gray-50">
               <td className="px-6 py-4 whitespace-nowrap">
                 <span className="text-sm font-medium text-gray-900">
-                  #{index + 1}
+                  #{(page - 1) * pageSize + idx + 1}
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -100,6 +112,18 @@ export default function PriorityTable({ vehicles }: PriorityTableProps) {
           ))}
         </tbody>
       </table>
+    </div>
+    {totalPages > 1 && (
+      <TablePagination
+        page={page}
+        totalPages={totalPages}
+        totalItems={vehicles.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+        unitLabel="台"
+      />
+    )}
     </div>
   )
 }

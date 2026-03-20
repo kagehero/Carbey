@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
-import { calculateStagnationDays, getStagnationColor, formatPrice } from '@/lib/utils'
+import { calculateStagnationDays } from '@/lib/utils'
 import { Download, TrendingUp, AlertTriangle } from 'lucide-react'
-import Link from 'next/link'
+import StagnationBandTable from '@/components/analytics/StagnationBandTable'
 
 const STAGNATION_BANDS = [
   { key: 'b0_15', label: '0-15日', min: 0, max: 15, tone: '正常', color: 'bg-green-100 text-green-800 border-green-200' },
@@ -105,79 +105,8 @@ export default async function StagnationAnalysisPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      車両
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      価格
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      掲載開始日
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      滞留日数
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      閲覧数
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      問合せ数
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      操作
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {vehiclesInBand.slice(0, 10).map((vehicle) => (
-                    <tr key={vehicle.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {vehicle.maker} {vehicle.car_name}
-                        </div>
-                        <div className="text-xs text-gray-500">{vehicle.grade}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900">
-                          {formatPrice(vehicle.price_body)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {vehicle.published_date ? new Date(vehicle.published_date).toLocaleDateString('ja-JP') : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`text-sm font-medium ${getStagnationColor(vehicle.stagnation_days)}`}>
-                          {vehicle.stagnation_days}日
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {vehicle.detail_views || 0}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {vehicle.email_inquiries || 0}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Link
-                          href={`/admin/inventory/${vehicle.id}`}
-                          className="text-primary hover:text-primary/80"
-                        >
-                          詳細
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              {vehiclesInBand.length > 10 && (
-                <div className="p-4 text-center border-t border-gray-200 text-sm text-gray-500">
-                  ... 他 {vehiclesInBand.length - 10}台
-                </div>
-              )}
+            <div className="p-6">
+              <StagnationBandTable vehicles={vehiclesInBand} />
             </div>
           </div>
         )

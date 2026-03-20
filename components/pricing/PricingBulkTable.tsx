@@ -1,8 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { formatPrice } from "@/lib/utils"
+import TablePagination from "@/components/ui/TablePagination"
 
 export type PricingMode = "optimization" | "ai"
 
@@ -65,6 +66,15 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
   const filteredRows = useMemo(
     () => (makerFilter === "all" ? rows : rows.filter((r) => r.maker === makerFilter)),
     [rows, makerFilter]
+  )
+
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(24)
+  useEffect(() => setPage(1), [makerFilter, pageSize, filteredRows.length])
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
+  const paginatedRows = useMemo(
+    () => filteredRows.slice((page - 1) * pageSize, page * pageSize),
+    [filteredRows, page, pageSize]
   )
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected])
@@ -294,7 +304,7 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  disabled={busy || rows.length === 0}
+                  disabled={busy || filteredRows.length === 0}
                 />
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">車両</th>
@@ -307,7 +317,7 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {rows.map((r) => {
+            {paginatedRows.map((r) => {
               const s = getSuggestedForMode(r)
               const clampedPrice = clampSuggestedPrice(r.currentPrice, s.suggested, guardrails, r.costPrice)
               const clamped = clampedPrice !== s.suggested
@@ -366,7 +376,21 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
         </table>
       </div>
 
-      <div className="text-xs text-gray-500">
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={filteredRows.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
+            unitLabel="台"
+          />
+        </div>
+      )}
+
+      <div className="text-xs text-gray-500 mt-4">
         ガードレール: 最低価格 {formatPrice(guardrails.minPriceYen)} / 原価+粗利下限 {formatPrice(guardrails.minMarginYen)} /
         最大値下げ率 {guardrails.maxDiscountPct}% / 最大値下げ額 {formatPrice(guardrails.maxDiscountYen)}
       </div>

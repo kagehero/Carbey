@@ -83,20 +83,20 @@ export default function DashboardStats({ initialStats }: DashboardStatsProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="bg-white rounded-lg shadow p-6">
+          <div key={kpi.label} className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6">
             <div className="flex items-center justify-between">
               <div className="flex-1">
-                <p className="text-sm text-gray-500">{kpi.label}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
+                <p className="text-sm text-slate-500">{kpi.label}</p>
+                <p className="text-3xl font-bold text-slate-800 mt-2 tabular-nums">
                   {kpi.value}
                 </p>
                 {'subValue' in kpi && (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     {kpi.subValue}
                   </p>
                 )}
               </div>
-              <div className={`p-3 rounded-lg ${kpi.bgColor}`}>
+              <div className={`p-3 rounded-xl ${kpi.bgColor}`}>
                 <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
               </div>
             </div>

@@ -1,8 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { calculateStagnationDays, calculateCVR, formatPrice, getStagnationColor, getCVRColor } from '@/lib/utils'
-import { DollarSign, AlertCircle, TrendingDown, CheckCircle } from 'lucide-react'
-import Link from 'next/link'
-import PricingBulkTable from '@/components/pricing/PricingBulkTable'
+import { calculateStagnationDays, calculateCVR, formatPrice } from '@/lib/utils'
+import { AlertCircle, TrendingDown, CheckCircle } from 'lucide-react'
+import PricingTabs from '@/components/pricing/PricingTabs'
+import PriceListExportButton from '@/components/pricing/PriceListExportButton'
 
 async function getPricingData() {
   const supabase = await createClient()
@@ -123,7 +123,7 @@ async function getPricingData() {
     .from('price_histories')
     .select('*, inventories(maker, car_name)')
     .order('changed_at', { ascending: false })
-    .limit(10)
+    .limit(500)
 
   return {
     discountCandidates: withSuggestions,
@@ -144,11 +144,21 @@ export default async function PricingOptimizationPage() {
     maxDiscountYen: parseInt(process.env.PRICING_MAX_DISCOUNT_YEN || '500000', 10) || 500000,
   }
 
+  const generatedAt = new Date().toLocaleString('ja-JP', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
+  }).replace(/\//g, '').replace(/:/g, '').replace(' ', '_').replace(',', '')
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">価格最適化</h1>
-        <p className="text-gray-500 mt-1">価格見直しの提案と履歴</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">価格最適化</h1>
+          <p className="text-gray-500 mt-1">価格見直しの提案と履歴</p>
+        </div>
+        {discountCandidates.length > 0 && (
+          <PriceListExportButton rows={discountCandidates as any} generatedAt={generatedAt} />
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -190,81 +200,12 @@ export default async function PricingOptimizationPage() {
         </div>
       </div>
 
-      {/* Discount Recommendations */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <DollarSign className="w-6 h-6 text-orange-500" />
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">価格見直し推奨</h2>
-              <p className="text-sm text-gray-500">滞留日数とCVRから算出した推奨値下げ</p>
-            </div>
-          </div>
-        </div>
-
-        {discountCandidates.length > 0 ? (
-          <div className="p-6">
-            <PricingBulkTable rows={discountCandidates as any} guardrails={guardrails} />
-          </div>
-        ) : (
-          <div className="p-12 text-center">
-            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-            <p className="text-gray-500">現在、価格見直しが必要な車両はありません</p>
-          </div>
-        )}
-      </div>
-
-      {/* Price History */}
-      {priceHistories.length > 0 && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">最近の価格変更履歴</h2>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">変更日時</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">車両</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">変更前</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">変更後</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">差額</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">変更率</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {priceHistories.map((history: any) => (
-                  <tr key={history.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(history.changed_at).toLocaleString('ja-JP')}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {history.inventories?.maker} {history.inventories?.car_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatPrice(history.old_price)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatPrice(history.new_price)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${history.price_diff < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {history.price_diff > 0 ? '+' : ''}{formatPrice(Math.abs(history.price_diff))}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${history.price_diff_pct < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {history.price_diff_pct > 0 ? '+' : ''}{history.price_diff_pct?.toFixed(1)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* 価格見直し推奨 / 変更履歴 タブ */}
+      <PricingTabs
+        discountCandidates={discountCandidates as any}
+        priceHistories={priceHistories as any}
+        guardrails={guardrails}
+      />
     </div>
   )
 }

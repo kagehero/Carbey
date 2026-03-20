@@ -3,6 +3,7 @@ import { calculateCVR, getCVRColor, formatPrice, formatNumber } from '@/lib/util
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import Link from 'next/link'
 import CVRPoorBulkTable from '@/components/analytics/CVRPoorBulkTable'
+import CVRTableWithPagination from '@/components/analytics/CVRTableWithPagination'
 
 async function getCVRData() {
   const supabase = await createClient()
@@ -87,7 +88,7 @@ export default async function CVRAnalysisPage() {
         ))}
       </div>
 
-      {/* Top Performers */}
+      {/* Top Performers (Excellent) */}
       {excellent.length > 0 && (
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
@@ -99,58 +100,26 @@ export default async function CVRAnalysisPage() {
               </div>
             </div>
           </div>
+          <div className="p-6">
+            <CVRTableWithPagination vehicles={excellent} unitLabel="台" />
+          </div>
+        </div>
+      )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">順位</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">車両</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">価格</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">閲覧数</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">問合せ数</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CVR</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {excellent.slice(0, 10).map((vehicle, index) => (
-                  <tr key={vehicle.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      #{index + 1}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {vehicle.maker} {vehicle.car_name}
-                      </div>
-                      <div className="text-xs text-gray-500">{vehicle.grade}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatPrice(vehicle.price_body)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatNumber(vehicle.detail_views)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatNumber(vehicle.email_inquiries)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr)}`}>
-                        {vehicle.cvr.toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <Link
-                        href={`/admin/inventory/${vehicle.id}`}
-                        className="text-primary hover:text-primary/80"
-                      >
-                        詳細
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Good Performers */}
+      {good.length > 0 && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <Activity className="w-6 h-6 text-blue-600" />
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">良好な車両</h2>
+                <p className="text-sm text-gray-500">CVR 2%以上5%未満の車両</p>
+              </div>
+            </div>
+          </div>
+          <div className="p-6">
+            <CVRTableWithPagination vehicles={good} unitLabel="台" />
           </div>
         </div>
       )}
@@ -169,7 +138,7 @@ export default async function CVRAnalysisPage() {
           </div>
 
           <div className="p-6">
-            <CVRPoorBulkTable rows={poor.slice(0, 50) as any} />
+            <CVRPoorBulkTable rows={poor as any} />
           </div>
         </div>
       )}

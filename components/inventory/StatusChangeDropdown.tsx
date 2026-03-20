@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
+import { useToast } from '@/components/ui/ToastProvider'
 
 interface StatusChangeDropdownProps {
   vehicleId: string
@@ -13,6 +14,7 @@ interface StatusChangeDropdownProps {
 export default function StatusChangeDropdown({ vehicleId, currentStatus }: StatusChangeDropdownProps) {
   const router = useRouter()
   const supabase = createClient()
+  const { showToast } = useToast()
   const [isChanging, setIsChanging] = useState(false)
   const [status, setStatus] = useState(currentStatus)
 
@@ -32,10 +34,11 @@ export default function StatusChangeDropdown({ vehicleId, currentStatus }: Statu
       if (error) throw error
 
       setStatus(newStatus)
+      showToast(`1件のステータスを変更しました（→ ${newStatus}）`, 'success')
       router.refresh()
     } catch (err) {
       console.error('Status update failed:', err)
-      alert('ステータスの更新に失敗しました')
+      showToast(err instanceof Error ? err.message : 'ステータスの更新に失敗しました', 'error')
     } finally {
       setIsChanging(false)
     }
