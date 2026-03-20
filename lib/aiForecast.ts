@@ -82,7 +82,7 @@ export function computeAIForecast(
   const poorCVRVehicles = onSale.filter((i) => {
     const views = i.detail_views || 0
     if (views === 0) return false
-    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
+    const cvr = calculateCVR(i.email_inquiries ?? null, i.detail_views ?? null)
     return cvr > 0 && cvr < 2
   })
 

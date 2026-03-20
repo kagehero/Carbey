@@ -12,9 +12,10 @@ export async function POST(request: NextRequest) {
     
     console.log('Starting sync from:', pythonDir)
     
-    // Execute the Python sync command with increased timeout
+    // Use PYTHON_PATH env if set (avoids Turbopack resolving .venv symlink at build)
+    const pythonCmd = process.env.PYTHON_PATH || path.join(process.cwd(), '.venv', 'bin', 'python')
     const { stdout, stderr } = await execAsync(
-      path.join(process.cwd(), '.venv', 'bin', 'python') + ' carbey.py sync',
+      pythonCmd + ' carbey.py sync',
       {
         cwd: pythonDir,
         timeout: 180000, // 3 minutes

@@ -8,6 +8,10 @@ const nextConfig = {
       },
     ],
   },
+  // Turbopack fails on .venv symlink pointing outside project; exclude from tracing
+  outputFileTracingExcludes: {
+    '*': ['.venv/**'],
+  },
 }
 
 module.exports = nextConfig
