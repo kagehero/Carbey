@@ -9,7 +9,8 @@ type VehicleRow = {
   maker: string | null
   car_name: string | null
   grade: string | null
-  year: string | null
+  year?: string | number | null
+  color?: string | null
   stagnation_days: number
   cvr: number
   detail_views: number
@@ -62,9 +63,9 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
     let rows = vehicles
     if (search) {
       const q = search.toLowerCase()
-      rows = rows.filter(v =>
-        [v.maker, v.car_name, v.grade].some(f => f?.toLowerCase().includes(q))
-      )
+      const searchable = (v: VehicleRow) =>
+        [v.maker, v.car_name, v.grade, v.year, v.color].filter(Boolean).map(String).join(' ').toLowerCase()
+      rows = rows.filter(v => searchable(v).includes(q))
     }
     if (makerFilter) rows = rows.filter(v => v.maker === makerFilter)
     if (stagnationFilter) {
@@ -100,7 +101,7 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="車名・グレードで絞込"
+            placeholder="メーカー、車名、グレード、年式、色で検索"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm w-52"

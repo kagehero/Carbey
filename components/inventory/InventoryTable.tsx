@@ -63,11 +63,26 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
 
   const filtered = useMemo(() => {
     return vehiclesWithData.filter(inv => {
-      const matchesSearch =
-        !searchTerm ||
-        inv.maker?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.car_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.vehicle_code?.toLowerCase().includes(searchTerm.toLowerCase())
+      const searchLower = searchTerm.toLowerCase()
+      const searchableText = [
+        inv.maker,
+        inv.car_name,
+        inv.grade,
+        inv.grade_notes,
+        inv.vehicle_code,
+        inv.management_number,
+        inv.vin,
+        inv.year_display,
+        inv.color,
+        inv.mileage_display,
+        inv.comment1,
+        inv.comment2,
+      ]
+        .filter(Boolean)
+        .map(String)
+        .join(' ')
+        .toLowerCase()
+      const matchesSearch = !searchTerm || searchableText.includes(searchLower)
       const matchesStatus = statusFilter === 'all' || inv.status === statusFilter
       const matchesMaker = makerFilter === 'all' || inv.maker === makerFilter
       return matchesSearch && matchesStatus && matchesMaker
@@ -109,7 +124,7 @@ export default function InventoryTable({ inventories }: InventoryTableProps) {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="メーカー、車種、物件コードで検索..."
+              placeholder="メーカー、車名、グレード、物件コード、色などで検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"

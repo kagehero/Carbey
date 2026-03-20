@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     
     // Execute the Python sync command with increased timeout
     const { stdout, stderr } = await execAsync(
-      'python carbey.py sync',
+      path.join(process.cwd(), '.venv', 'bin', 'python') + ' carbey.py sync',
       {
         cwd: pythonDir,
         timeout: 180000, // 3 minutes
