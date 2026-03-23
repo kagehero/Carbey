@@ -9,10 +9,12 @@ import { BarChart2 } from 'lucide-react'
 async function getIntegratedData() {
   const supabase = await createClient()
 
+  // 掲載有・在庫有（公開中の在庫車両）のみ
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('status', '販売中')
+    .eq('publication_status', '掲載')
+    .eq('stock_status', 'あり')
 
   const vehicles = (inventories || []).map((v: any) => {
     const stagnation_days = calculateStagnationDays(v.published_date)
@@ -74,7 +76,15 @@ async function getIntegratedData() {
     }
   }).sort((a, b) => b.stagnation_days - a.stagnation_days)
 
-  const forecast = computeAIForecast(vehicles)
+  const forecast = computeAIForecast(
+    (inventories || []).map((v: any) => ({
+      status: v.status || '販売中',
+      price_body: v.price_body,
+      detail_views: v.detail_views,
+      email_inquiries: v.email_inquiries,
+      published_date: v.published_date,
+    }))
+  )
 
   return { vehicles, forecast }
 }

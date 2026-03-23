@@ -5,7 +5,7 @@ import path from 'path'
 
 const execAsync = promisify(exec)
 
-export async function POST(request: NextRequest) {
+async function runSync(): Promise<NextResponse> {
   try {
     // Python scripts are now in web/python/
     const pythonDir = path.join(process.cwd(), 'python')
@@ -67,4 +67,18 @@ export async function POST(request: NextRequest) {
       stdout: error.stdout,
     }, { status: 500 })
   }
+}
+
+export async function POST(_request: NextRequest) {
+  return runSync()
+}
+
+/** Vercel Cron用：9時・18時(JST)に1日2回実行。CRON_SECRETを設定必須 */
+export async function GET(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+  const secret = process.env.CRON_SECRET
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return runSync()
 }

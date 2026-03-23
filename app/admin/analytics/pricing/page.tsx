@@ -7,10 +7,12 @@ import PriceListExportButton from '@/components/pricing/PriceListExportButton'
 async function getPricingData() {
   const supabase = await createClient()
 
+  // 掲載有・在庫有（公開中の在庫車両）のみ
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('status', '販売中')
+    .eq('publication_status', '掲載')
+    .eq('stock_status', 'あり')
 
   const vehicles = (inventories || []).map((v: any) => ({
     ...v,

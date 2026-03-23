@@ -129,7 +129,7 @@ export default function AIAnalysisForecast({ forecast }: AIAnalysisForecastProps
         </div>
 
         <p className="text-xs text-slate-500">
-          ※ 想定成約率15%、基準回転率3.5%/月で算出。滞留・価格最適化と連動した改善施策の効果を試算しています。
+          ※ 想定成約率15%、基準回転率30%/月（上限50%/月）で算出。滞留・価格最適化と連動した改善施策の効果を試算しています。
         </p>
       </div>
     </div>

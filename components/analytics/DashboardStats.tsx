@@ -42,7 +42,7 @@ export default function DashboardStats({ initialStats }: DashboardStatsProps) {
     {
       label: '販売中',
       value: initialStats.onSale,
-      subValue: `在庫あり: ${initialStats.inStock}台 | 在庫なし: ${initialStats.outOfStock}台`,
+      subValue: `在庫総数${initialStats.total}台のうち掲載中`,
       icon: TrendingUp,
       color: 'text-green-600',
       bgColor: 'bg-green-50'

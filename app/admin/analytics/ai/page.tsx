@@ -7,16 +7,20 @@ import { Sparkles } from 'lucide-react'
 async function getAIData() {
   const supabase = await createClient()
 
+  // 掲載有・在庫有（公開中の在庫車両）のみでAI予測
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
+    .eq('publication_status', '掲載')
+    .eq('stock_status', 'あり')
 
   const forecast = computeAIForecast(
     (inventories || []).map((i: any) => ({
-      status: i.status || '',
+      status: i.status || '販売中',
       price_body: i.price_body,
       detail_views: i.detail_views,
       email_inquiries: i.email_inquiries,
+      published_date: i.published_date,
     }))
   )
 

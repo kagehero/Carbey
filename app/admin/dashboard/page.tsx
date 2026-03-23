@@ -26,45 +26,56 @@ async function getDashboardStats() {
 
   const typedInventories = (inventories || []) as Inventory[]
 
-  const total = typedInventories.length || 0
-  const onSale = typedInventories.filter(i => i.status === '販売中').length || 0
+  // 販売中 = 掲載有・在庫有（公開中の在庫車両のみ）
+  const isVisibleOnSale = (i: Inventory) =>
+    i.publication_status === '掲載' && i.stock_status === 'あり'
+  // 在庫総数 = 掲載有・在庫有 + 掲載無・在庫有（売れる前の実在庫）
+  const isInStock = (i: Inventory) => i.stock_status === 'あり'
+
+  const onSale = typedInventories.filter(isVisibleOnSale).length || 0
+  const total = typedInventories.filter(isInStock).length || 0
   const sold = typedInventories.filter(i => i.status === '売約済').length || 0
   const unpublished = typedInventories.filter(i => i.status === '非公開').length || 0
-  
-  // Publication status stats
-  const published = typedInventories.filter(i => i.publication_status === '掲載').length || 0
-  const notPublished = typedInventories.filter(i => i.publication_status === '非掲載').length || 0
-  
-  // Stock status stats
+
+  const publishedAndInStock = typedInventories.filter(
+    i => i.publication_status === '掲載' && i.stock_status === 'あり'
+  ).length
+  const notPublishedAndInStock = typedInventories.filter(
+    i => i.publication_status === '非掲載' && i.stock_status === 'あり'
+  ).length
+
   const inStock = typedInventories.filter(i => i.stock_status === 'あり').length || 0
   const outOfStock = typedInventories.filter(i => i.stock_status === 'なし').length || 0
 
-  // Calculate average stagnation
-  const stagnationDays = typedInventories
-    .filter(i => i.published_date && i.status === '販売中')
+  // 販売中車両（掲載有・在庫有）を分析対象に
+  const visibleOnSaleVehicles = typedInventories.filter(
+    i => isVisibleOnSale(i) && i.published_date
+  )
+
+  // Calculate average stagnation（掲載有・在庫有のみ）
+  const stagnationDays = visibleOnSaleVehicles
     .map(i => calculateStagnationDays(i.published_date!))
-  const avgStagnation = stagnationDays && stagnationDays.length > 0
+  const avgStagnation = stagnationDays.length > 0
     ? Math.round(stagnationDays.reduce((a, b) => a + b, 0) / stagnationDays.length)
     : 0
 
-  // Calculate average CVR
-  const cvrs = typedInventories
+  // Calculate average CVR（掲載有・在庫有のみ）
+  const cvrs = visibleOnSaleVehicles
     .filter(i => i.detail_views && i.detail_views > 0)
     .map(i => calculateCVR(i.email_inquiries, i.detail_views))
   const avgCVR = cvrs && cvrs.length > 0
     ? (cvrs.reduce((a, b) => a + b, 0) / cvrs.length).toFixed(2)
     : '0.00'
 
-  // Discount candidates
-  const discountCount = typedInventories.filter(i => {
-    if (i.status !== '販売中') return false
+  // 値下げ検討対象（掲載有・在庫有のみ、滞留60日以上 or CVR2%未満）
+  const discountCandidates = visibleOnSaleVehicles.filter(i => {
     const days = calculateStagnationDays(i.published_date!)
     const cvr = calculateCVR(i.email_inquiries, i.detail_views)
     return days >= 60 || cvr < 2
-  }).length || 0
+  })
+  const discountCount = discountCandidates.length
 
-  // Alert counts for reminder panel
-  const onSaleVehicles = typedInventories.filter(i => i.status === '販売中' && i.published_date)
+  const onSaleVehicles = visibleOnSaleVehicles
   const stagnation180 = onSaleVehicles.filter(i => calculateStagnationDays(i.published_date!) >= 180).length
   const stagnation90 = onSaleVehicles.filter(i => {
     const d = calculateStagnationDays(i.published_date!)
@@ -95,7 +106,7 @@ async function getDashboardStats() {
 
   const distribution = stagnationBands.map(band => {
     const count = typedInventories.filter(i => {
-      if (i.status !== '販売中' || !i.published_date) return false
+      if (!isVisibleOnSale(i) || !i.published_date) return false
       const days = calculateStagnationDays(i.published_date)
       return days >= band.min && days <= band.max
     }).length || 0
@@ -128,19 +139,19 @@ async function getDashboardStats() {
     }
   })
 
-  // CVR analytics: 要改善 vs 改善見込み vs 優秀
-  const cvrExcellent = typedInventories.filter(
+  // CVR analytics: 要改善 vs 改善見込み vs 優秀（掲載有・在庫有のみ）
+  const cvrExcellent = visibleOnSaleVehicles.filter(
     (i) => calculateCVR(i.email_inquiries, i.detail_views) >= 5
   ).length
-  const cvrGood = typedInventories.filter((i) => {
+  const cvrGood = visibleOnSaleVehicles.filter((i) => {
     const cvr = calculateCVR(i.email_inquiries, i.detail_views)
     return cvr >= 2 && cvr < 5
   }).length
-  const cvrPoor = typedInventories.filter((i) => {
+  const cvrPoor = visibleOnSaleVehicles.filter((i) => {
     const cvr = calculateCVR(i.email_inquiries, i.detail_views)
     return cvr > 0 && cvr < 2
   }).length
-  const cvrWithData = typedInventories.filter(
+  const cvrWithData = visibleOnSaleVehicles.filter(
     (i) => i.detail_views && i.detail_views > 0
   ).length
   const cvrAnalyticsData = [
@@ -187,9 +198,9 @@ async function getDashboardStats() {
     }
   })
 
-  // AI分析・将来予測（CVR改善時の想定回転率・売上高）
+  // AI分析・将来予測（掲載有・在庫有のみ、現実的回転率ベース）
   const forecast = computeAIForecast(
-    typedInventories.map((i) => ({
+    visibleOnSaleVehicles.map((i) => ({
       status: i.status || '',
       price_body: i.price_body,
       detail_views: i.detail_views,
@@ -198,9 +209,9 @@ async function getDashboardStats() {
     }))
   )
 
-  // Priority vehicles (high stagnation + low CVR)
+  // Priority vehicles (high stagnation + low CVR)（掲載有・在庫有のみ）
   const priorityVehicles = typedInventories
-    .filter(i => i.status === '販売中' && i.published_date)
+    .filter(i => isVisibleOnSale(i) && i.published_date)
     .map(i => {
       const stagnation = calculateStagnationDays(i.published_date!)
       const cvr = calculateCVR(i.email_inquiries, i.detail_views)
@@ -216,8 +227,8 @@ async function getDashboardStats() {
       onSale,
       sold,
       unpublished,
-      published,
-      notPublished,
+      published: publishedAndInStock,
+      notPublished: notPublishedAndInStock,
       inStock,
       outOfStock,
       avgStagnation,
@@ -231,6 +242,7 @@ async function getDashboardStats() {
     pricingAnalyticsData,
     forecast,
     priorityVehicles,
+    discountCandidates,
     inventories: typedInventories,
     alerts: { stagnation60, stagnation90, stagnation180, lowCVR, pricingCandidates: discountCount }
   }
@@ -246,6 +258,7 @@ export default async function DashboardPage() {
     pricingAnalyticsData,
     forecast,
     priorityVehicles,
+    discountCandidates,
     inventories,
     alerts,
   } = await getDashboardStats()
@@ -368,14 +381,7 @@ export default async function DashboardPage() {
             滞留60日以上 または CVR 2%未満の車両
           </p>
         </div>
-        <DiscountCandidates 
-          vehicles={inventories.filter(i => {
-            if (i.status !== '販売中' || !i.published_date) return false
-            const days = calculateStagnationDays(i.published_date)
-            const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-            return days >= 60 || cvr < 2
-          })} 
-        />
+        <DiscountCandidates vehicles={discountCandidates} />
       </div>
     </div>
   )
