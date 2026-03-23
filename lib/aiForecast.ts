@@ -15,16 +15,20 @@ export type InventoryForForecast = {
 export type ForecastParams = {
   /** 問合せ→成約の想定成約率（0-1） */
   inquiryToSaleRate?: number
-  /** 月間基準回転率（在庫に対する割合、0-1）例: 0.03 = 3%/月 */
+  /** 月間基準回転率（在庫に対する割合、0-1）例: 0.30 = 30%/月 */
   baseMonthlyTurnoverRate?: number
   /** CVR改善目標値（%）例: 2.5 */
   targetCVR?: number
+  /** 月間回転率の上限（0-1）。改善後もこの値を超えない。例: 0.5 = 50%/月 */
+  maxMonthlyTurnoverRate?: number
 }
 
-const DEFAULT_PARAMS: Required<ForecastParams> = {
+// 業界水準: 小売り 20-50%/月。基準30%、上限50%で現実的レンジに
+const DEFAULT_PARAMS = {
   inquiryToSaleRate: 0.15,
-  baseMonthlyTurnoverRate: 0.035,
+  baseMonthlyTurnoverRate: 0.30,
   targetCVR: 2.5,
+  maxMonthlyTurnoverRate: 0.50,
 }
 
 function calculateCVR(inquiries: number | null, views: number | null): number {
@@ -70,8 +74,9 @@ export function computeAIForecast(
   inventories: InventoryForForecast[],
   params: ForecastParams = {}
 ): AIForecastResult {
-  const p = { ...DEFAULT_PARAMS, ...params }
-  const onSale = inventories.filter((i) => i.status === '販売中')
+  const p = { ...DEFAULT_PARAMS, ...params } as typeof DEFAULT_PARAMS
+  // 呼び出し元で掲載有・在庫有に絞った配列を渡す想定。そのまま全件を販売中として扱う
+  const onSale = inventories
   const onSaleCount = onSale.length
 
   const getPrice = (i: InventoryForForecast) =>
@@ -117,8 +122,11 @@ export function computeAIForecast(
   const currentAssumedMonthlySales = Math.round(
     onSaleCount * p.baseMonthlyTurnoverRate
   )
-  const improvedAssumedMonthlySales =
-    currentAssumedMonthlySales + assumedAdditionalSales
+  const maxMonthlySales = Math.round(onSaleCount * (p.maxMonthlyTurnoverRate ?? 0.5))
+  const uncappedImproved = currentAssumedMonthlySales + assumedAdditionalSales
+  const improvedAssumedMonthlySales = Math.min(uncappedImproved, maxMonthlySales)
+  const displayAdditionalSales = improvedAssumedMonthlySales - currentAssumedMonthlySales
+  const displayAdditionalRevenue = Math.round(displayAdditionalSales * poorCVRAvgPrice)
 
   const currentTurnoverRatePct =
     onSaleCount > 0 ? (currentAssumedMonthlySales / onSaleCount) * 100 : 0
@@ -135,8 +143,8 @@ export function computeAIForecast(
     poorCVRTotalInquiries,
     poorCVRAvgCVR,
     assumedAdditionalInquiries,
-    assumedAdditionalSales,
-    assumedAdditionalRevenue,
+    assumedAdditionalSales: displayAdditionalSales,
+    assumedAdditionalRevenue: displayAdditionalRevenue,
     currentAssumedMonthlySales,
     improvedAssumedMonthlySales,
     currentTurnoverRatePct,
