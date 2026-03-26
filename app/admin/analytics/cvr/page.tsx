@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { VISIBLE_ON_SALE_MATCH } from '@/lib/inventoryMetrics'
 import { calculateCVR, getCVRColor, formatPrice, formatNumber } from '@/lib/utils'
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import Link from 'next/link'
@@ -8,12 +9,10 @@ import CVRTableWithPagination from '@/components/analytics/CVRTableWithPaginatio
 async function getCVRData() {
   const supabase = await createClient()
 
-  // 掲載有・在庫有（公開中の在庫車両）のみ
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('publication_status', '掲載')
-    .eq('stock_status', 'あり')
+    .match(VISIBLE_ON_SALE_MATCH)
     .order('detail_views', { ascending: false })
 
   const allInventories = inventories || []
@@ -59,7 +58,9 @@ export default async function CVRAnalysisPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">CVR分析</h1>
-        <p className="text-gray-500 mt-1">コンバージョン率（問い合わせ率）の詳細分析</p>
+        <p className="text-gray-500 mt-1">
+          掲載有・在庫有の車両のみ。コンバージョン率（問い合わせ率）の詳細分析
+        </p>
       </div>
 
       {/* Summary Cards */}
@@ -70,7 +71,7 @@ export default async function CVRAnalysisPage() {
             {avgCVR.toFixed(2)}%
           </div>
           <div className="text-xs text-gray-500 mt-2">
-            {total}台のデータから算出
+            掲載有・在庫有のうち閲覧数あり{total}台から算出
           </div>
         </div>
 

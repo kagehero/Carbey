@@ -110,7 +110,7 @@ export default function PricingAnalyticsChart({ data, totalOnSale }: PricingAnal
         </ComposedChart>
       </ResponsiveContainer>
       <p className="text-xs text-slate-500 mt-5 mb-1 text-center px-2">
-        値下げ検討対象 = 滞留60日以上 または CVR 2%未満（販売中 {totalOnSale}台に対する割合）
+        値下げ検討対象 = 滞留60日以上 または CVR 2%未満（掲載有・在庫有 {totalOnSale}台に対する割合）
       </p>
     </div>
   )
