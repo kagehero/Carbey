@@ -110,7 +110,7 @@ export default function StagnationAnalyticsChart({ data, totalOnSale }: Stagnati
         </ComposedChart>
       </ResponsiveContainer>
       <p className="text-xs text-slate-500 mt-5 mb-1 text-center px-2">
-        不良在庫 = 滞留60日以上の車両（販売中 {totalOnSale}台に対する割合）
+        不良在庫 = 滞留60日以上の車両（掲載有・在庫有 {totalOnSale}台に対する割合）
       </p>
     </div>
   )

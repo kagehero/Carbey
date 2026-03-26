@@ -5,56 +5,62 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Save, X, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { mapVehicleFormToDbInsert, mapVehicleFormToDbUpdate } from '@/lib/inventoryFormMap'
 
 interface VehicleEditFormProps {
-  vehicle: any
+  vehicle?: any | null
+  mode?: 'create' | 'edit'
 }
 
-export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
+export default function VehicleEditForm({ vehicle, mode }: VehicleEditFormProps) {
   const router = useRouter()
   const supabase = createClient()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
+  const effectiveMode = mode ?? (vehicle?.id ? 'edit' : 'create')
+  const v = vehicle ?? {}
+
   const [formData, setFormData] = useState({
     // Basic Info
-    maker: vehicle.maker || '',
-    car_name: vehicle.car_name || '',
-    grade: vehicle.grade || '',
-    vehicle_code: vehicle.vehicle_code || '',
+    maker: v.maker || '',
+    car_name: v.car_name || '',
+    grade: v.grade || '',
+    vehicle_code: v.vehicle_code || '',
     
     // Pricing
-    price_body: vehicle.price_body || 0,
-    price_total: vehicle.price_total || 0,
+    price_body: v.price_body || 0,
+    price_total: v.price_total || 0,
     
     // Status
-    status: vehicle.status || '販売中',
-    publication_status: vehicle.publication_status || '掲載',
+    status: v.status || '販売中',
+    publication_status: v.publication_status || '掲載',
+    stock_status: v.stock_status || 'あり',
     
     // Specifications
-    year: vehicle.year || '',
-    mileage: vehicle.mileage || 0,
-    body_color: vehicle.body_color || '',
-    transmission: vehicle.transmission || '',
-    fuel_type: vehicle.fuel_type || '',
-    drive_type: vehicle.drive_type || '',
+    year: v.year || '',
+    mileage: v.mileage || 0,
+    body_color: v.body_color || v.color || '',
+    transmission: v.transmission || '',
+    fuel_type: v.fuel_type || '',
+    drive_type: v.drive_type || '',
     
     // Details
-    vehicle_inspection: vehicle.vehicle_inspection || '',
-    repair_history: vehicle.repair_history || '',
-    one_owner: vehicle.one_owner || false,
+    vehicle_inspection: v.vehicle_inspection || v.inspection || '',
+    repair_history: v.repair_history || '',
+    one_owner: v.one_owner || false,
     
     // Contact
-    store_name: vehicle.store_name || '',
-    contact_person: vehicle.contact_person || '',
-    contact_phone: vehicle.contact_phone || '',
-    contact_email: vehicle.contact_email || '',
-    location: vehicle.location || '',
+    store_name: v.store_name || '',
+    contact_person: v.contact_person || '',
+    contact_phone: v.contact_phone || '',
+    contact_email: v.contact_email || '',
+    location: v.location || '',
     
     // Features
-    features: vehicle.features || '',
-    equipment: vehicle.equipment || '',
-    notes: vehicle.notes || '',
+    features: v.features || '',
+    equipment: v.equipment || '',
+    notes: v.notes || v.comment1 || '',
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -74,17 +80,35 @@ export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
     setError(null)
 
     try {
-      const { error: updateError } = await (supabase
-        .from('inventories') as any)
-        .update({
-          ...formData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', vehicle.id)
+      if (effectiveMode === 'create') {
+        const code = String(formData.vehicle_code ?? '').trim()
+        if (!code) {
+          setError('車両コードは必須です')
+          setSaving(false)
+          return
+        }
+        const insertPayload = mapVehicleFormToDbInsert(formData)
+        const { data: inserted, error: insertError } = await (supabase.from('inventories') as any)
+          .insert(insertPayload)
+          .select('id')
+          .single()
+
+        if (insertError) throw insertError
+        if (!inserted?.id) throw new Error('登録に失敗しました')
+
+        router.push(`/admin/inventory/${inserted.id}`)
+        router.refresh()
+        return
+      }
+
+      const updatePayload = mapVehicleFormToDbUpdate(formData)
+      const { error: updateError } = await (supabase.from('inventories') as any)
+        .update(updatePayload)
+        .eq('id', vehicle!.id)
 
       if (updateError) throw updateError
 
-      router.push(`/admin/inventory/${vehicle.id}`)
+      router.push(`/admin/inventory/${vehicle!.id}`)
       router.refresh()
     } catch (err: any) {
       setError(err.message)
@@ -229,6 +253,25 @@ export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
               <option value="掲載">掲載</option>
               <option value="非掲載">非掲載</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              在庫ステータス <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="stock_status"
+              value={formData.stock_status}
+              onChange={handleChange}
+              required
+              className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="あり">在庫あり</option>
+              <option value="なし">在庫なし</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              ダッシュボード・分析の「販売中」は掲載有・在庫有で集計されます
+            </p>
           </div>
         </div>
       </section>
@@ -490,7 +533,7 @@ export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
       {/* Action Buttons */}
       <div className="flex justify-end gap-3 pt-6 border-t">
         <Link
-          href={`/admin/inventory/${vehicle.id}`}
+          href={effectiveMode === 'create' ? '/admin/inventory' : `/admin/inventory/${vehicle!.id}`}
           className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
         >
           <X className="w-4 h-4" />
@@ -504,12 +547,12 @@ export default function VehicleEditForm({ vehicle }: VehicleEditFormProps) {
           {saving ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              保存中...
+              {effectiveMode === 'create' ? '登録中...' : '保存中...'}
             </>
           ) : (
             <>
               <Save className="w-4 h-4" />
-              保存
+              {effectiveMode === 'create' ? '登録' : '保存'}
             </>
           )}
         </button>

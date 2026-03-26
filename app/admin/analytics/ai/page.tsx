@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { VISIBLE_ON_SALE_MATCH } from '@/lib/inventoryMetrics'
 import { computeAIForecast } from '@/lib/aiForecast'
 import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
 import Link from 'next/link'
@@ -7,12 +8,10 @@ import { Sparkles } from 'lucide-react'
 async function getAIData() {
   const supabase = await createClient()
 
-  // 掲載有・在庫有（公開中の在庫車両）のみでAI予測
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('publication_status', '掲載')
-    .eq('stock_status', 'あり')
+    .match(VISIBLE_ON_SALE_MATCH)
 
   const forecast = computeAIForecast(
     (inventories || []).map((i: any) => ({

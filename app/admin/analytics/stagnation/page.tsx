@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { VISIBLE_ON_SALE_MATCH } from '@/lib/inventoryMetrics'
 import { calculateStagnationDays } from '@/lib/utils'
 import { Download, TrendingUp, AlertTriangle } from 'lucide-react'
 import StagnationBandTable from '@/components/analytics/StagnationBandTable'
@@ -19,12 +20,10 @@ const STAGNATION_BANDS = [
 async function getStagnationData() {
   const supabase = await createClient()
 
-  // 掲載有・在庫有（公開中の在庫車両）のみ
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('publication_status', '掲載')
-    .eq('stock_status', 'あり')
+    .match(VISIBLE_ON_SALE_MATCH)
     .order('published_date', { ascending: true })
 
   const vehicles = (inventories || []).map((v: any) => {
@@ -61,7 +60,9 @@ export default async function StagnationAnalysisPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">滞留分析</h1>
-          <p className="text-gray-500 mt-1">在庫の滞留状況を詳細に分析</p>
+          <p className="text-gray-500 mt-1">
+            掲載有・在庫有の車両のみを対象に滞留状況を分析します
+          </p>
         </div>
 
         <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
@@ -117,7 +118,7 @@ export default async function StagnationAnalysisPage() {
       {total === 0 && (
         <div className="bg-white rounded-lg shadow p-12 text-center">
           <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">販売中の在庫がありません</p>
+          <p className="text-gray-500">掲載有・在庫有の在庫がありません</p>
         </div>
       )}
     </div>

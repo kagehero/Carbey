@@ -11,6 +11,7 @@ import { calculateStagnationDays, calculateCVR } from '@/lib/utils'
 import { computeAIForecast } from '@/lib/aiForecast'
 import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
 import { Database } from '@/types/database'
+import { isVisibleOnSale, isInStock } from '@/lib/inventoryMetrics'
 
 type Inventory = Database['public']['Tables']['inventories']['Row']
 
@@ -26,22 +27,14 @@ async function getDashboardStats() {
 
   const typedInventories = (inventories || []) as Inventory[]
 
-  // 販売中 = 掲載有・在庫有（公開中の在庫車両のみ）
-  const isVisibleOnSale = (i: Inventory) =>
-    i.publication_status === '掲載' && i.stock_status === 'あり'
-  // 在庫総数 = 掲載有・在庫有 + 掲載無・在庫有（売れる前の実在庫）
-  const isInStock = (i: Inventory) => i.stock_status === 'あり'
-
-  const onSale = typedInventories.filter(isVisibleOnSale).length || 0
-  const total = typedInventories.filter(isInStock).length || 0
+  const onSale = typedInventories.filter((i) => isVisibleOnSale(i)).length || 0
+  const total = typedInventories.filter((i) => isInStock(i)).length || 0
   const sold = typedInventories.filter(i => i.status === '売約済').length || 0
   const unpublished = typedInventories.filter(i => i.status === '非公開').length || 0
 
-  const publishedAndInStock = typedInventories.filter(
-    i => i.publication_status === '掲載' && i.stock_status === 'あり'
-  ).length
+  const publishedAndInStock = typedInventories.filter((i) => isVisibleOnSale(i)).length
   const notPublishedAndInStock = typedInventories.filter(
-    i => i.publication_status === '非掲載' && i.stock_status === 'あり'
+    (i) => i.publication_status === '非掲載' && i.stock_status === 'あり'
   ).length
 
   const inStock = typedInventories.filter(i => i.stock_status === 'あり').length || 0
@@ -49,7 +42,7 @@ async function getDashboardStats() {
 
   // 販売中車両（掲載有・在庫有）を分析対象に
   const visibleOnSaleVehicles = typedInventories.filter(
-    i => isVisibleOnSale(i) && i.published_date
+    (i) => isVisibleOnSale(i) && i.published_date
   )
 
   // Calculate average stagnation（掲載有・在庫有のみ）
@@ -211,7 +204,7 @@ async function getDashboardStats() {
 
   // Priority vehicles (high stagnation + low CVR)（掲載有・在庫有のみ）
   const priorityVehicles = typedInventories
-    .filter(i => isVisibleOnSale(i) && i.published_date)
+    .filter((i) => isVisibleOnSale(i) && i.published_date)
     .map(i => {
       const stagnation = calculateStagnationDays(i.published_date!)
       const cvr = calculateCVR(i.email_inquiries, i.detail_views)

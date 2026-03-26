@@ -25,7 +25,7 @@ export default async function InventoryPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">在庫管理</h1>
           <p className="text-gray-500 mt-1">
-            全{inventories?.length || 0}台の在庫を管理
+            全{inventories?.length || 0}件（同期・手動登録を含む）。分析・ダッシュボードの「販売中」は掲載有・在庫有のみ。
           </p>
         </div>
 

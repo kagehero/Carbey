@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { VISIBLE_ON_SALE_MATCH } from '@/lib/inventoryMetrics'
 import { calculateStagnationDays, calculateCVR, formatPrice } from '@/lib/utils'
 import { AlertCircle, TrendingDown, CheckCircle } from 'lucide-react'
 import PricingTabs from '@/components/pricing/PricingTabs'
@@ -7,12 +8,10 @@ import PriceListExportButton from '@/components/pricing/PriceListExportButton'
 async function getPricingData() {
   const supabase = await createClient()
 
-  // 掲載有・在庫有（公開中の在庫車両）のみ
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('publication_status', '掲載')
-    .eq('stock_status', 'あり')
+    .match(VISIBLE_ON_SALE_MATCH)
 
   const vehicles = (inventories || []).map((v: any) => ({
     ...v,
@@ -156,7 +155,9 @@ export default async function PricingOptimizationPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">価格最適化</h1>
-          <p className="text-gray-500 mt-1">価格見直しの提案と履歴</p>
+          <p className="text-gray-500 mt-1">
+            掲載有・在庫有の車両のみ。価格見直しの提案と履歴
+          </p>
         </div>
         {discountCandidates.length > 0 && (
           <PriceListExportButton rows={discountCandidates as any} generatedAt={generatedAt} />

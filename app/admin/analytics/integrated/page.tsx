@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { VISIBLE_ON_SALE_MATCH } from '@/lib/inventoryMetrics'
 import { calculateStagnationDays, calculateCVR, formatPrice } from '@/lib/utils'
 import { computeAIForecast } from '@/lib/aiForecast'
 import IntegratedAnalysisTable from '@/components/analytics/IntegratedAnalysisTable'
@@ -9,12 +10,10 @@ import { BarChart2 } from 'lucide-react'
 async function getIntegratedData() {
   const supabase = await createClient()
 
-  // 掲載有・在庫有（公開中の在庫車両）のみ
   const { data: inventories } = await supabase
     .from('inventories')
     .select('*')
-    .eq('publication_status', '掲載')
-    .eq('stock_status', 'あり')
+    .match(VISIBLE_ON_SALE_MATCH)
 
   const vehicles = (inventories || []).map((v: any) => {
     const stagnation_days = calculateStagnationDays(v.published_date)
@@ -139,7 +138,7 @@ export default async function IntegratedAnalysisPage() {
       {/* Integrated table */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-5 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">全販売中車両 — 横断データ一覧</h2>
+          <h2 className="text-base font-semibold text-gray-900">掲載有・在庫有 — 横断データ一覧</h2>
           <p className="text-xs text-gray-500 mt-0.5">滞留・CVR・提案価格を比較しながら優先順位を判断できます</p>
         </div>
         <IntegratedAnalysisTable vehicles={vehicles} />

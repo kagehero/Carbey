@@ -69,6 +69,9 @@ export default function DashboardStats({ initialStats }: DashboardStatsProps) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
           <p className="text-gray-500 mt-1">在庫状況と分析データの概要</p>
+          <p className="text-xs text-slate-400 mt-1.5 max-w-xl">
+            「販売中」およびダッシュボード分析は掲載有・在庫有で統一。在庫総数は在庫ありの全台数です。
+          </p>
         </div>
         
         <button
