@@ -11,6 +11,7 @@ import { calculateStagnationDays, calculateCVR } from '@/lib/utils'
 import { computeAIForecast } from '@/lib/aiForecast'
 import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
 import { Database } from '@/types/database'
+import { Timer } from 'lucide-react'
 import { isVisibleOnSale, isInStock } from '@/lib/inventoryMetrics'
 
 type Inventory = Database['public']['Tables']['inventories']['Row']
@@ -266,11 +267,18 @@ export default async function DashboardPage() {
 
       {/* 分析結果グラフ（棒・線） */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow px-6 pt-6 pb-3">
-          <h2 className="text-base font-semibold text-slate-800 mb-1">滞留分析</h2>
-          <p className="text-sm text-slate-500 mb-5">
-            不良在庫割合（線）と不良在庫の滞留台数（棒）
-          </p>
+        <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow px-6 pt-5 pb-4">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+              <Timer className="h-5 w-5" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-semibold text-slate-800">滞留分析</h2>
+              <p className="text-sm text-slate-500 mt-0.5 leading-snug">
+                60日超の滞留（不良在庫）を帯別に表示。棒＝台数、線＝全体に占める割合。
+              </p>
+            </div>
+          </div>
           <StagnationAnalyticsChart
             data={stagnationAnalyticsData}
             totalOnSale={stats.onSale}
