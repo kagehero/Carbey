@@ -133,7 +133,12 @@ async function getPricingData() {
   }
 }
 
-export default async function PricingOptimizationPage() {
+export default async function PricingOptimizationPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ highlight?: string }>
+}) {
+  const { highlight } = await searchParams
   const { discountCandidates, priceHistories, total } = await getPricingData()
 
   const totalPotentialSavings = discountCandidates.reduce((sum, v: any) => sum + (v.discountAmountOptimization || 0), 0)
@@ -208,6 +213,7 @@ export default async function PricingOptimizationPage() {
         discountCandidates={discountCandidates as any}
         priceHistories={priceHistories as any}
         guardrails={guardrails}
+        highlightVehicleId={highlight}
       />
     </div>
   )

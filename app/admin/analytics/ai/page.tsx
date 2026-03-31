@@ -13,21 +13,21 @@ async function getAIData() {
     .select('*')
     .match(VISIBLE_ON_SALE_MATCH)
 
-  const forecast = computeAIForecast(
-    (inventories || []).map((i: any) => ({
-      status: i.status || '販売中',
-      price_body: i.price_body,
-      detail_views: i.detail_views,
-      email_inquiries: i.email_inquiries,
-      published_date: i.published_date,
-    }))
-  )
+  const snapshot = (inventories || []).map((i: any) => ({
+    status: i.status || '販売中',
+    price_body: i.price_body,
+    detail_views: i.detail_views,
+    email_inquiries: i.email_inquiries,
+    published_date: i.published_date,
+  }))
 
-  return { forecast }
+  const forecast = computeAIForecast(snapshot)
+
+  return { forecast, snapshot }
 }
 
 export default async function AIAnalysisPage() {
-  const { forecast } = await getAIData()
+  const { forecast, snapshot } = await getAIData()
 
   return (
     <div className="space-y-6">
@@ -43,7 +43,7 @@ export default async function AIAnalysisPage() {
         </div>
       </div>
 
-      <AIAnalysisForecast forecast={forecast} />
+      <AIAnalysisForecast forecast={forecast} inventorySnapshot={snapshot} />
 
       <div className="flex gap-3">
         <Link
