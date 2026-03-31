@@ -75,21 +75,20 @@ async function getIntegratedData() {
     }
   }).sort((a, b) => b.stagnation_days - a.stagnation_days)
 
-  const forecast = computeAIForecast(
-    (inventories || []).map((v: any) => ({
-      status: v.status || '販売中',
-      price_body: v.price_body,
-      detail_views: v.detail_views,
-      email_inquiries: v.email_inquiries,
-      published_date: v.published_date,
-    }))
-  )
+  const forecastSnapshot = (inventories || []).map((v: any) => ({
+    status: v.status || '販売中',
+    price_body: v.price_body,
+    detail_views: v.detail_views,
+    email_inquiries: v.email_inquiries,
+    published_date: v.published_date,
+  }))
+  const forecast = computeAIForecast(forecastSnapshot)
 
-  return { vehicles, forecast }
+  return { vehicles, forecast, forecastSnapshot }
 }
 
 export default async function IntegratedAnalysisPage() {
-  const { vehicles, forecast } = await getIntegratedData()
+  const { vehicles, forecast, forecastSnapshot } = await getIntegratedData()
 
   const urgentCount = vehicles.filter(v => v.stagnation_days >= 180).length
   const warnCount = vehicles.filter(v => v.stagnation_days >= 60 && v.stagnation_days < 180).length
@@ -109,7 +108,7 @@ export default async function IntegratedAnalysisPage() {
       </div>
 
       {/* AI分析・将来予測 */}
-      <AIAnalysisForecast forecast={forecast} />
+      <AIAnalysisForecast forecast={forecast} inventorySnapshot={forecastSnapshot} />
 
       {/* Quick summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

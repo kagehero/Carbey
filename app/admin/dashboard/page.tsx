@@ -13,6 +13,8 @@ import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
 import { Database } from '@/types/database'
 import { Timer } from 'lucide-react'
 import { isVisibleOnSale, isInStock } from '@/lib/inventoryMetrics'
+import PriceChangeTrendChart from '@/components/analytics/PriceChangeTrendChart'
+import type { InventoryForForecast } from '@/lib/aiForecast'
 
 type Inventory = Database['public']['Tables']['inventories']['Row']
 
@@ -193,15 +195,40 @@ async function getDashboardStats() {
   })
 
   // AI分析・将来予測（掲載有・在庫有のみ、現実的回転率ベース）
-  const forecast = computeAIForecast(
-    visibleOnSaleVehicles.map((i) => ({
-      status: i.status || '',
-      price_body: i.price_body,
-      detail_views: i.detail_views,
-      email_inquiries: i.email_inquiries,
-      published_date: i.published_date,
-    }))
-  )
+  const forecastInventorySnapshot: InventoryForForecast[] = visibleOnSaleVehicles.map((i) => ({
+    status: i.status || '',
+    price_body: i.price_body,
+    detail_views: i.detail_views,
+    email_inquiries: i.email_inquiries,
+    published_date: i.published_date,
+  }))
+
+  const forecast = computeAIForecast(forecastInventorySnapshot)
+
+  // 直近30日の価格変更件数（時系列）
+  const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const { data: priceHistRows } = await supabase
+    .from('price_histories')
+    .select('changed_at')
+    .gte('changed_at', since30)
+
+  const dayCounts = new Map<string, number>()
+  const histRows = (priceHistRows || []) as { changed_at: string }[]
+  for (const row of histRows) {
+    const ca = row.changed_at
+    if (!ca) continue
+    const day = ca.slice(0, 10)
+    dayCounts.set(day, (dayCounts.get(day) || 0) + 1)
+  }
+  const priceTrendData: { date: string; count: number }[] = []
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    const label = `${d.getMonth() + 1}/${d.getDate()}`
+    priceTrendData.push({ date: label, count: dayCounts.get(key) || 0 })
+  }
 
   // Priority vehicles (high stagnation + low CVR)（掲載有・在庫有のみ）
   const priorityVehicles = typedInventories
@@ -235,6 +262,8 @@ async function getDashboardStats() {
     cvrWithData,
     pricingAnalyticsData,
     forecast,
+    forecastInventorySnapshot,
+    priceTrendData,
     priorityVehicles,
     discountCandidates,
     inventories: typedInventories,
@@ -251,6 +280,8 @@ export default async function DashboardPage() {
     cvrWithData,
     pricingAnalyticsData,
     forecast,
+    forecastInventorySnapshot,
+    priceTrendData,
     priorityVehicles,
     discountCandidates,
     inventories,
@@ -263,7 +294,7 @@ export default async function DashboardPage() {
       <DashboardStats initialStats={stats} />
 
       {/* AI分析・将来予測 */}
-      <AIAnalysisForecast forecast={forecast} />
+      <AIAnalysisForecast forecast={forecast} inventorySnapshot={forecastInventorySnapshot} />
 
       {/* 分析結果グラフ（棒・線） */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -306,6 +337,23 @@ export default async function DashboardPage() {
             totalOnSale={stats.onSale}
           />
         </div>
+      </div>
+
+      {/* 価格変更トレンド（時系列） */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-base font-semibold text-slate-800">価格変更の動き</h2>
+            <p className="text-sm text-slate-500 mt-0.5">直近30日の価格変更件数（変更履歴ベース）</p>
+          </div>
+          <a
+            href="/admin/analytics/pricing"
+            className="text-sm text-sky-600 hover:text-sky-700 font-medium shrink-0"
+          >
+            価格最適化へ →
+          </a>
+        </div>
+        <PriceChangeTrendChart data={priceTrendData} />
       </div>
 
       {/* 滞留日数分布・CVR統計 */}

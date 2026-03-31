@@ -23,13 +23,15 @@ export type ForecastParams = {
   maxMonthlyTurnoverRate?: number
 }
 
-// 業界水準: 小売り 20-50%/月。基準30%、上限50%で現実的レンジに
-const DEFAULT_PARAMS = {
+/** Default simulation parameters (exported for UI sliders). */
+export const FORECAST_DEFAULTS = {
   inquiryToSaleRate: 0.15,
   baseMonthlyTurnoverRate: 0.30,
   targetCVR: 2.5,
   maxMonthlyTurnoverRate: 0.50,
-}
+} as const
+
+const DEFAULT_PARAMS = { ...FORECAST_DEFAULTS }
 
 function calculateCVR(inquiries: number | null, views: number | null): number {
   if (!views || views === 0) return 0

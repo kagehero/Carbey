@@ -65,6 +65,9 @@ export default function PriorityTable({ vehicles }: PriorityTableProps) {
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               操作
             </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              価格最適化
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -106,6 +109,14 @@ export default function PriorityTable({ vehicles }: PriorityTableProps) {
                   className="text-primary hover:text-primary/80 inline-flex items-center gap-1"
                 >
                   詳細 <ExternalLink className="w-3 h-3" />
+                </Link>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                <Link
+                  href={`/admin/analytics/pricing?highlight=${vehicle.id}`}
+                  className="text-orange-600 hover:text-orange-700 font-medium inline-flex items-center gap-1"
+                >
+                  見直しへ
                 </Link>
               </td>
             </tr>

@@ -60,6 +60,10 @@ export default function NotificationSettingsForm({ userId, initial }: Props) {
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-gray-500 leading-relaxed rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+        日次サマリー（滞留・値下げ目安など）は、SMTP と <code className="text-[11px] bg-white px-1 rounded">DAILY_SUMMARY_TO</code>{" "}
+        および <code className="text-[11px] bg-white px-1 rounded">CRON_SECRET</code> 設定時に 1 日 1 回メール送信されます（Vercel Cron）。
+      </p>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-900">メール通知</p>

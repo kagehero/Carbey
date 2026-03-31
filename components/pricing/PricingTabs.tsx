@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DollarSign, History } from 'lucide-react'
 import PricingBulkTable from './PricingBulkTable'
 import PriceHistoryTable from './PriceHistoryTable'
@@ -19,14 +19,21 @@ type Props = {
   discountCandidates: any[]
   priceHistories: any[]
   guardrails: Guardrails
+  /** Scroll to and emphasize this vehicle row on the recommend tab */
+  highlightVehicleId?: string
 }
 
 export default function PricingTabs({
   discountCandidates,
   priceHistories,
   guardrails,
+  highlightVehicleId,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('recommend')
+
+  useEffect(() => {
+    if (highlightVehicleId) setActiveTab('recommend')
+  }, [highlightVehicleId])
 
   const tabs: { id: TabId; label: string; icon: typeof DollarSign }[] = [
     { id: 'recommend', label: '価格見直し推奨', icon: DollarSign },
@@ -64,7 +71,11 @@ export default function PricingTabs({
               滞留日数とCVRから算出した推奨値下げ
             </p>
             {discountCandidates.length > 0 ? (
-              <PricingBulkTable rows={discountCandidates} guardrails={guardrails} />
+              <PricingBulkTable
+                rows={discountCandidates}
+                guardrails={guardrails}
+                highlightVehicleId={highlightVehicleId}
+              />
             ) : (
               <div className="py-12 text-center">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />

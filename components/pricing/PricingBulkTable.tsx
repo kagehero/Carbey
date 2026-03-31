@@ -36,6 +36,7 @@ type Guardrails = {
 type Props = {
   rows: PricingRow[]
   guardrails: Guardrails
+  highlightVehicleId?: string
 }
 
 function clampSuggestedPrice(current: number, suggested: number, g: Guardrails, costPrice?: number | null) {
@@ -47,7 +48,7 @@ function clampSuggestedPrice(current: number, suggested: number, g: Guardrails, 
   return Math.max(suggested, floor)
 }
 
-export default function PricingBulkTable({ rows, guardrails }: Props) {
+export default function PricingBulkTable({ rows, guardrails, highlightVehicleId }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [mode, setMode] = useState<PricingMode>("optimization")
   const [makerFilter, setMakerFilter] = useState<string>("all")
@@ -71,11 +72,29 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(24)
   useEffect(() => setPage(1), [makerFilter, pageSize, filteredRows.length])
+
+  useEffect(() => {
+    if (!highlightVehicleId) return
+    const idx = filteredRows.findIndex((r) => r.id === highlightVehicleId)
+    if (idx >= 0) setPage(Math.floor(idx / pageSize) + 1)
+  }, [highlightVehicleId, filteredRows, pageSize])
+
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const paginatedRows = useMemo(
     () => filteredRows.slice((page - 1) * pageSize, page * pageSize),
     [filteredRows, page, pageSize]
   )
+
+  useEffect(() => {
+    if (!highlightVehicleId) return
+    const t = window.setTimeout(() => {
+      document.getElementById(`pricing-row-${highlightVehicleId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [highlightVehicleId, paginatedRows])
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected])
   const allSelected = selectedIds.length > 0 && selectedIds.length === filteredRows.length
@@ -309,6 +328,9 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">車両</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">現在価格</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">原価</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">粗利（現）</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">粗利（提案後）</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">推奨値下げ</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">新価格</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">滞留日数</th>
@@ -323,9 +345,20 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
               const clamped = clampedPrice !== s.suggested
               const discountAmount = r.currentPrice - clampedPrice
               const pct = r.currentPrice > 0 ? Math.round((discountAmount / r.currentPrice) * 100) : 0
+              const cost = typeof r.costPrice === "number" && !Number.isNaN(r.costPrice) ? r.costPrice : null
+              const marginNow = cost != null ? r.currentPrice - cost : null
+              const marginAfter = cost != null ? clampedPrice - cost : null
+              const marginWarn =
+                cost != null && marginAfter != null && marginAfter < guardrails.minMarginYen
+
+              const isHi = highlightVehicleId === r.id
 
               return (
-                <tr key={r.id} className="hover:bg-gray-50">
+                <tr
+                  key={r.id}
+                  id={`pricing-row-${r.id}`}
+                  className={`hover:bg-gray-50 ${isHi ? "ring-2 ring-inset ring-orange-400 bg-orange-50/40" : ""}`}
+                >
                   <td className="px-4 py-4">
                     <input
                       type="checkbox"
@@ -343,6 +376,28 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm text-gray-900">{formatPrice(r.currentPrice)}</span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {cost != null ? formatPrice(cost) : "—"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {marginNow != null ? (
+                      <span className={marginNow < guardrails.minMarginYen ? "text-orange-600 font-medium" : "text-gray-900"}>
+                        {formatPrice(marginNow)}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    {marginAfter != null ? (
+                      <span className={marginWarn ? "text-red-600 font-semibold" : "text-gray-900"}>
+                        {formatPrice(marginAfter)}
+                        {marginWarn ? <span className="block text-[10px] text-red-500">下限未満</span> : null}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-red-600">-{pct}%</div>
                     <div className="text-xs text-gray-500">-{formatPrice(discountAmount)}</div>
@@ -352,13 +407,9 @@ export default function PricingBulkTable({ rows, guardrails }: Props) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-green-700">{formatPrice(clampedPrice)}</span>
-                    {typeof r.costPrice === "number" ? (
-                      <div className="text-[11px] text-gray-500 mt-1">
-                        原価 {formatPrice(r.costPrice)} / 粗利下限 {formatPrice(guardrails.minMarginYen)}
-                      </div>
-                    ) : (
-                      <div className="text-[11px] text-orange-600 mt-1">原価未設定（原価ガード無効）</div>
-                    )}
+                    {typeof r.costPrice !== "number" ? (
+                      <div className="text-[11px] text-orange-600 mt-1">原価未設定</div>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-gray-900">{r.stagnation_days}日</span>
