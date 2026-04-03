@@ -21,6 +21,8 @@ type Props = {
   guardrails: Guardrails
   /** Scroll to and emphasize this vehicle row on the recommend tab */
   highlightVehicleId?: string
+  /** 在庫加重平均CVR（%）— 一覧はこの未満のみ */
+  fleetAvgCvr: number
 }
 
 export default function PricingTabs({
@@ -28,6 +30,7 @@ export default function PricingTabs({
   priceHistories,
   guardrails,
   highlightVehicleId,
+  fleetAvgCvr,
 }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('recommend')
 
@@ -68,18 +71,20 @@ export default function PricingTabs({
         {activeTab === 'recommend' && (
           <>
             <p className="text-sm text-gray-500 mb-4">
-              滞留日数とCVRから算出した推奨値下げ
+              対象は閲覧あり・平均未満・滞留60日以上（ダッシュボードと同じ）。並びはCVRギャップ優先。ルール／AIはギャップ・1%/2%ライン・滞留を反映します。
             </p>
             {discountCandidates.length > 0 ? (
               <PricingBulkTable
                 rows={discountCandidates}
                 guardrails={guardrails}
                 highlightVehicleId={highlightVehicleId}
+                fleetAvgCvr={fleetAvgCvr}
               />
             ) : (
               <div className="py-12 text-center">
                 <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <p className="text-gray-500">現在、価格見直しが必要な車両はありません</p>
+                <p className="text-gray-500">CVR が平均未満の車両はありません（閲覧あり・掲載在庫ベース）</p>
+                <p className="text-sm text-gray-400 mt-2">閲覧数のない車両は CVR 比較の対象外です。</p>
               </div>
             )}
           </>

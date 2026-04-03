@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { VISIBLE_ON_SALE_MATCH } from '@/lib/inventoryMetrics'
 import { calculateStagnationDays, calculateCVR, formatPrice } from '@/lib/utils'
+import { computeFleetWeightedAvgCvr, isCvrBelowFleetAvg, CVR_TIER_PCT } from '@/lib/cvrPolicy'
 import { computeAIForecast } from '@/lib/aiForecast'
 import IntegratedAnalysisTable from '@/components/analytics/IntegratedAnalysisTable'
 import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
@@ -15,7 +16,10 @@ async function getIntegratedData() {
     .select('*')
     .match(VISIBLE_ON_SALE_MATCH)
 
-  const vehicles = (inventories || []).map((v: any) => {
+  const inv = inventories || []
+  const fleetAvgCvr = computeFleetWeightedAvgCvr(inv)
+
+  const vehicles = inv.map((v: any) => {
     const stagnation_days = calculateStagnationDays(v.published_date)
     const cvr = calculateCVR(v.email_inquiries, v.detail_views)
     const currentPrice = v.price_body || 0
@@ -26,9 +30,9 @@ async function getIntegratedData() {
     if (stagnation_days >= 180) { optPct = 15; optReason.push('180日超') }
     else if (stagnation_days >= 90) { optPct = 10; optReason.push('90日超') }
     else if (stagnation_days >= 60) { optPct = 5; optReason.push('60日超') }
-    if (cvr < 1 && v.detail_views && v.detail_views > 10) {
+    if (cvr < CVR_TIER_PCT.reward / 2 && v.detail_views && v.detail_views > 10) {
       optPct = Math.max(optPct, 10); optReason.push('CVR極低')
-    } else if (cvr < 2 && cvr > 0) {
+    } else if ((v.detail_views || 0) > 0 && isCvrBelowFleetAvg(cvr, fleetAvgCvr, true)) {
       optPct = Math.max(optPct, 5); optReason.push('CVR低')
     }
     const suggestedPriceOpt = optPct > 0 ? Math.floor(currentPrice * (1 - optPct / 100)) : null
@@ -46,7 +50,7 @@ async function getIntegratedData() {
     if (cvr === 0 && views >= 30) { aiPct = Math.max(aiPct, 12); aiReason.push('CVR0(閲覧多)') }
     else if (cvr < 0.5 && views >= 20) { aiPct = Math.max(aiPct, 10); aiReason.push('CVR極低(閲覧多)') }
     else if (cvr < 1 && views >= 10) { aiPct = Math.max(aiPct, 8); aiReason.push('CVR低(閲覧有)') }
-    else if (cvr < 2 && cvr > 0) { aiPct = Math.max(aiPct, 6); aiReason.push('CVR低') }
+    else if (views > 0 && isCvrBelowFleetAvg(cvr, fleetAvgCvr, true)) { aiPct = Math.max(aiPct, 6); aiReason.push('CVR低') }
     const suggestedPriceAI = aiPct > 0 ? Math.floor(currentPrice * (1 - aiPct / 100)) : null
 
     return {
@@ -75,7 +79,7 @@ async function getIntegratedData() {
     }
   }).sort((a, b) => b.stagnation_days - a.stagnation_days)
 
-  const forecastSnapshot = (inventories || []).map((v: any) => ({
+  const forecastSnapshot = inv.map((v: any) => ({
     status: v.status || '販売中',
     price_body: v.price_body,
     detail_views: v.detail_views,
@@ -84,15 +88,15 @@ async function getIntegratedData() {
   }))
   const forecast = computeAIForecast(forecastSnapshot)
 
-  return { vehicles, forecast, forecastSnapshot }
+  return { vehicles, forecast, forecastSnapshot, fleetAvgCvr }
 }
 
 export default async function IntegratedAnalysisPage() {
-  const { vehicles, forecast, forecastSnapshot } = await getIntegratedData()
+  const { vehicles, forecast, forecastSnapshot, fleetAvgCvr } = await getIntegratedData()
 
   const urgentCount = vehicles.filter(v => v.stagnation_days >= 180).length
   const warnCount = vehicles.filter(v => v.stagnation_days >= 60 && v.stagnation_days < 180).length
-  const lowCVRCount = vehicles.filter(v => v.cvr > 0 && v.cvr < 2).length
+  const lowCVRCount = vehicles.filter(v => v.detail_views > 0 && isCvrBelowFleetAvg(v.cvr, fleetAvgCvr, true)).length
   const hasProposal = vehicles.filter(v => v.suggestedPriceOpt != null || v.suggestedPriceAI != null).length
 
   return (
@@ -124,7 +128,7 @@ export default async function IntegratedAnalysisPage() {
         </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="text-2xl font-bold text-yellow-700">{lowCVRCount}台</div>
-          <div className="text-sm text-yellow-600 font-medium">CVR 2%未満</div>
+          <div className="text-sm text-yellow-600 font-medium">CVR 在庫平均未満</div>
           <Link href="/admin/analytics/cvr" className="text-xs text-yellow-500 hover:underline">CVR分析 →</Link>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -140,7 +144,7 @@ export default async function IntegratedAnalysisPage() {
           <h2 className="text-base font-semibold text-gray-900">掲載有・在庫有 — 横断データ一覧</h2>
           <p className="text-xs text-gray-500 mt-0.5">滞留・CVR・提案価格を比較しながら優先順位を判断できます</p>
         </div>
-        <IntegratedAnalysisTable vehicles={vehicles} />
+        <IntegratedAnalysisTable vehicles={vehicles} fleetAvgCvr={fleetAvgCvr} />
       </div>
     </div>
   )

@@ -73,18 +73,6 @@ export function calculateCVR(inquiries: number | null, views: number | null): nu
   return (inquiries / views) * 100
 }
 
-export function getCVRLabel(cvr: number): string {
-  if (cvr >= 5) return '優秀'
-  if (cvr >= 2) return '良好'
-  return '要改善'
-}
-
-export function getCVRColor(cvr: number): string {
-  if (cvr >= 5) return 'text-green-600'
-  if (cvr >= 2) return 'text-blue-600'
-  return 'text-red-600'
-}
-
 export function getNoStagnationReason(
   publishedDate: string | Date | null,
   publicationStatus?: string | null,

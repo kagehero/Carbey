@@ -1,5 +1,6 @@
 import { calculateCVR, calculateStagnationDays } from '@/lib/utils'
 import { isVisibleOnSale, isInStock } from '@/lib/inventoryMetrics'
+import { computeFleetWeightedAvgCvr, isCvrBelowFleetAvg, isDashboardPriceReviewCandidate } from '@/lib/cvrPolicy'
 import type { Database } from '@/types/database'
 
 type Row = Database['public']['Tables']['inventories']['Row']
@@ -25,6 +26,8 @@ export function buildDashboardSummary(inventories: Row[]): DashboardSummaryPaylo
   const avgStagnation =
     stagnations.length > 0 ? Math.round(stagnations.reduce((a, b) => a + b, 0) / stagnations.length) : 0
 
+  const fleetAvgCvr = computeFleetWeightedAvgCvr(onList)
+
   let stagnation180 = 0
   let stagnation90to179 = 0
   let discountCandidates = 0
@@ -36,8 +39,9 @@ export function buildDashboardSummary(inventories: Row[]): DashboardSummaryPaylo
     else if (d >= 90) stagnation90to179++
 
     const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-    if (d >= 60 || cvr < 2) discountCandidates++
-    if (i.detail_views && i.detail_views > 0 && cvr > 0 && cvr < 2) lowCvrCount++
+    const hasViews = (i.detail_views || 0) > 0
+    if (isDashboardPriceReviewCandidate(d, cvr, fleetAvgCvr, hasViews)) discountCandidates++
+    if (hasViews && isCvrBelowFleetAvg(cvr, fleetAvgCvr, true)) lowCvrCount++
   }
 
   return {
@@ -73,7 +77,7 @@ export function formatDailySummaryHtml(baseUrl: string, s: DashboardSummaryPaylo
     <tr><td style="padding: 6px 16px 6px 0; color: #64748b;">滞留 180日超</td><td style="font-weight: 600; color: #b91c1c;">${s.stagnation180}台</td></tr>
     <tr><td style="padding: 6px 16px 6px 0; color: #64748b;">滞留 90〜179日</td><td style="font-weight: 600;">${s.stagnation90to179}台</td></tr>
     <tr><td style="padding: 6px 16px 6px 0; color: #64748b;">値下げ検討対象（目安）</td><td style="font-weight: 600;">${s.discountCandidates}台</td></tr>
-    <tr><td style="padding: 6px 16px 6px 0; color: #64748b;">CVR 2%未満（閲覧あり）</td><td style="font-weight: 600;">${s.lowCvrCount}台</td></tr>
+    <tr><td style="padding: 6px 16px 6px 0; color: #64748b;">CVR 在庫平均未満（閲覧あり）</td><td style="font-weight: 600;">${s.lowCvrCount}台</td></tr>
   </table>
   <p style="margin-top: 24px;"><a href="${dash}" style="color: #2563eb;">ダッシュボードを開く</a></p>
 </body></html>

@@ -3,6 +3,9 @@
  * 滞留・CVR・価格最適化と連動
  */
 
+import { calculateCVR } from '@/lib/utils'
+import { computeFleetWeightedAvgCvr, isCvrBelowFleetAvg } from '@/lib/cvrPolicy'
+
 export type InventoryForForecast = {
   status: string
   price_body?: number | null
@@ -27,26 +30,29 @@ export type ForecastParams = {
 export const FORECAST_DEFAULTS = {
   inquiryToSaleRate: 0.15,
   baseMonthlyTurnoverRate: 0.30,
-  targetCVR: 2.5,
+  /** 初期は「標準」目標（UIでいつでも変更可） */
+  targetCVR: 2.0,
   maxMonthlyTurnoverRate: 0.50,
 } as const
 
+/** スライダー・入力の許容範囲（%） */
+export const TARGET_CVR_RANGE = { min: 0.3, max: 5.0, step: 0.1 } as const
+
 const DEFAULT_PARAMS = { ...FORECAST_DEFAULTS }
 
-function calculateCVR(inquiries: number | null, views: number | null): number {
-  if (!views || views === 0) return 0
-  if (!inquiries) return 0
-  return (inquiries / views) * 100
-}
-
 export type AIForecastResult = {
-  /** 要改善車両数（CVR 2%未満） */
+  /**
+   * 販売中かつ閲覧ありの在庫全体の加重平均CVR（%）。
+   * 主な改善車両は「個別CVRがこの値を下回る」台で決める。
+   */
+  fleetAvgCVR: number
+  /** 主な改善車両数（在庫平均CVRを下回る台・閲覧あり） */
   poorCVRCount: number
-  /** 要改善車両の総閲覧数 */
+  /** 主な改善車両の総閲覧数 */
   poorCVRTotalViews: number
-  /** 要改善車両の現状総問合せ数 */
+  /** 主な改善車両の現状総問合せ数 */
   poorCVRTotalInquiries: number
-  /** 要改善車両の現状平均CVR */
+  /** 主な改善車両グループの現状加重平均CVR（%） */
   poorCVRAvgCVR: number
   /** 想定追加問合せ数（CVR改善時） */
   assumedAdditionalInquiries: number
@@ -86,11 +92,12 @@ export function computeAIForecast(
   const totalValue = onSale.reduce((sum, i) => sum + getPrice(i), 0)
   const avgPrice = onSaleCount > 0 ? Math.round(totalValue / onSaleCount) : 0
 
-  const poorCVRVehicles = onSale.filter((i) => {
-    const views = i.detail_views || 0
-    if (views === 0) return false
+  const withViews = onSale.filter((i) => (i.detail_views || 0) > 0)
+  const fleetAvgCVR = computeFleetWeightedAvgCvr(onSale)
+
+  const poorCVRVehicles = withViews.filter((i) => {
     const cvr = calculateCVR(i.email_inquiries ?? null, i.detail_views ?? null)
-    return cvr > 0 && cvr < 2
+    return isCvrBelowFleetAvg(cvr, fleetAvgCVR, true)
   })
 
   const poorCVRCount = poorCVRVehicles.length
@@ -140,6 +147,7 @@ export function computeAIForecast(
     improvedAssumedMonthlySales * avgPrice
 
   return {
+    fleetAvgCVR,
     poorCVRCount,
     poorCVRTotalViews,
     poorCVRTotalInquiries,

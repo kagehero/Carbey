@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Inventory } from '@/types'
 import { formatPrice, formatMileage, calculateStagnationDays, getStagnationColor } from '@/lib/utils'
+import { computeFleetWeightedAvgCvr, isCvrBelowFleetAvg, CVR_TIER_PCT } from '@/lib/cvrPolicy'
 import { Search, SlidersHorizontal, ArrowUpDown, Eye } from 'lucide-react'
 import { Calendar, Gauge } from 'lucide-react'
 import TablePagination from '@/components/ui/TablePagination'
@@ -52,6 +53,8 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
   )
   const [makerFilter, setMakerFilter] = useState<string>('all')
 
+  const fleetAvgCvr = useMemo(() => computeFleetWeightedAvgCvr(inventories), [inventories])
+
   // Calculate stagnation, CVR and derived analytics for each vehicle
   const vehiclesWithData = useMemo(() => {
     return inventories.map(inv => {
@@ -60,13 +63,13 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
       const cvr = views > 0 ? ((inv.email_inquiries || 0) / views) * 100 : 0
       const priority = stagnation_days * 1.0 + (5 - Math.min(cvr, 5)) * 10.0
 
-      // Optimization discount suggestion (mirrors pricing page logic)
+      // Optimization discount suggestion (mirrors pricing / integrated logic)
       let optPct = 0
       if (stagnation_days >= 180) optPct = 15
       else if (stagnation_days >= 90) optPct = 10
       else if (stagnation_days >= 60) optPct = 5
-      if (cvr < 1 && views > 10) optPct = Math.max(optPct, 10)
-      else if (cvr < 2 && cvr > 0) optPct = Math.max(optPct, 5)
+      if (cvr < CVR_TIER_PCT.reward / 2 && views > 10) optPct = Math.max(optPct, 10)
+      else if (views > 0 && isCvrBelowFleetAvg(cvr, fleetAvgCvr, true)) optPct = Math.max(optPct, 5)
       const discountAmountOpt = Math.floor((inv.price_body || 0) * optPct / 100)
 
       // AI discount suggestion
@@ -78,9 +81,9 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
       else if (stagnation_days >= 90) aiPct = 10
       else if (stagnation_days >= 60) aiPct = 6
       if (cvr === 0 && views >= 30) aiPct = Math.max(aiPct, 12)
-      else if (cvr < 0.5 && views >= 20) aiPct = Math.max(aiPct, 10)
-      else if (cvr < 1 && views >= 10) aiPct = Math.max(aiPct, 8)
-      else if (cvr < 2 && cvr > 0) aiPct = Math.max(aiPct, 6)
+      else if (cvr < CVR_TIER_PCT.reward / 2 && views >= 20) aiPct = Math.max(aiPct, 10)
+      else if (cvr < CVR_TIER_PCT.reward && views >= 10) aiPct = Math.max(aiPct, 8)
+      else if (views > 0 && isCvrBelowFleetAvg(cvr, fleetAvgCvr, true)) aiPct = Math.max(aiPct, 6)
 
       return {
         ...inv,
@@ -91,7 +94,7 @@ export default function InventoryGrid({ inventories }: InventoryGridProps) {
         aiPct,
       }
     })
-  }, [inventories])
+  }, [inventories, fleetAvgCvr])
 
   // Filter
   const filtered = useMemo(() => {

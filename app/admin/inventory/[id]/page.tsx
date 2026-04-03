@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { formatPrice, formatMileage, calculateStagnationDays, calculateCVR, getStagnationColor, getCVRColor, getNoStagnationReason } from '@/lib/utils'
+import { formatPrice, formatMileage, calculateStagnationDays, calculateCVR, getStagnationColor, getNoStagnationReason } from '@/lib/utils'
+import { getCVRColor } from '@/lib/cvrPolicy'
 import { Calendar, Eye, Mail, Phone, MapPin, Gauge, Palette, Car, AlertCircle, Edit } from 'lucide-react'
 import Link from 'next/link'
 

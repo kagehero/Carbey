@@ -54,11 +54,11 @@ export default function DashboardAlerts({
     {
       href: "/admin/analytics/cvr",
       icon: Activity,
-      label: "CVR 2%未満",
+      label: "CVR平均未満",
       count: lowCVR,
       unit: "台",
       level: lowCVR > 0 ? "warn" : "ok",
-      detail: "反応率低下",
+      detail: "在庫平均を下回る",
     },
     {
       href: "/admin/analytics/pricing",

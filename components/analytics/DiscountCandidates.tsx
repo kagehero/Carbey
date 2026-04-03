@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { formatPrice, calculateStagnationDays, calculateCVR } from '@/lib/utils'
+import { computeFleetWeightedAvgCvr, isCvrBelowFleetAvg } from '@/lib/cvrPolicy'
 import { AlertTriangle, ExternalLink } from 'lucide-react'
 import { Inventory } from '@/types'
 import TablePagination from '@/components/ui/TablePagination'
@@ -20,6 +21,7 @@ export default function DiscountCandidates({ vehicles }: DiscountCandidatesProps
     () => vehicles.slice((page - 1) * pageSize, page * pageSize),
     [vehicles, page, pageSize]
   )
+  const fleetAvg = useMemo(() => computeFleetWeightedAvgCvr(vehicles), [vehicles])
 
   if (vehicles.length === 0) {
     return (
@@ -61,7 +63,8 @@ export default function DiscountCandidates({ vehicles }: DiscountCandidatesProps
             const cvr = calculateCVR(vehicle.email_inquiries, vehicle.detail_views)
             const reasons = []
             if (stagnation >= 60) reasons.push('滞留60日以上')
-            if (cvr < 2 && cvr > 0) reasons.push('CVR 2%未満')
+            if ((vehicle.detail_views || 0) > 0 && isCvrBelowFleetAvg(cvr, fleetAvg, true))
+              reasons.push('CVR 在庫平均未満')
 
             return (
               <tr key={vehicle.id} className="hover:bg-gray-50">
