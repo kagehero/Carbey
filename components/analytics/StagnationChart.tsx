@@ -10,39 +10,48 @@ interface StagnationChartProps {
   }>
 }
 
+/** 滞留が短い→長いの目安で緑系から赤系へ */
 const COLORS = [
-  '#22c55e', // green-500
-  '#3b82f6', // blue-500
-  '#0ea5e9', // sky-500
-  '#f59e0b', // amber-500
-  '#f97316', // orange-500
-  '#ef4444', // red-500
-  '#dc2626', // red-600
-  '#b91c1c', // red-700
+  '#22c55e',
+  '#4ade80',
+  '#3b82f6',
+  '#0ea5e9',
+  '#06b6d4',
+  '#14b8a6',
+  '#f59e0b',
+  '#f97316',
+  '#fb923c',
+  '#f87171',
+  '#ef4444',
+  '#dc2626',
+  '#b91c1c',
+  '#991b1b',
+  '#7f1d1d',
+  '#450a0a',
 ]
 const GRID_COLOR = '#f1f5f9'
 const AXIS_COLOR = '#64748b'
 
 export default function StagnationChart({ data }: StagnationChartProps) {
   return (
-    <div className="h-64">
+    <div className="h-[340px] min-h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           data={data}
-          margin={{ top: 16, right: 16, left: 8, bottom: 8 }}
-          barCategoryGap="12%"
-          barSize={24}
+          margin={{ top: 12, right: 12, left: 4, bottom: 4 }}
+          barCategoryGap="8%"
+          barSize={18}
         >
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
           <XAxis
             dataKey="name"
-            tick={{ fontSize: 10, fill: AXIS_COLOR }}
+            tick={{ fontSize: 9, fill: AXIS_COLOR }}
             axisLine={{ stroke: AXIS_COLOR, strokeWidth: 1 }}
             tickLine={false}
             interval={0}
-            angle={-30}
+            angle={-35}
             textAnchor="end"
-            height={56}
+            height={72}
           />
           <YAxis
             tick={{ fontSize: 11, fill: AXIS_COLOR }}

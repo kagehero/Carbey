@@ -78,13 +78,13 @@ export default function StagnationAnalyticsChart({ data, totalOnSale }: Stagnati
         </div>
       )}
 
-      <div className="h-[280px] w-full min-w-0">
+      <div className="h-[360px] w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={data}
-            margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
-            barCategoryGap="18%"
-            barGap={2}
+            margin={{ top: 8, right: 8, left: 0, bottom: 8 }}
+            barCategoryGap="12%"
+            barGap={1}
           >
             <defs>
               <linearGradient id="stagnationBarGrad" x1="0" y1="0" x2="0" y2="1">
@@ -95,14 +95,14 @@ export default function StagnationAnalyticsChart({ data, totalOnSale }: Stagnati
             <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 10, fill: AXIS_COLOR }}
+              tick={{ fontSize: 9, fill: AXIS_COLOR }}
               axisLine={{ stroke: '#cbd5e1' }}
               tickLine={false}
               interval={0}
-              angle={-20}
+              angle={-32}
               textAnchor="end"
-              height={52}
-              tickMargin={8}
+              height={78}
+              tickMargin={6}
             />
             <YAxis
               yAxisId="left"
@@ -154,7 +154,7 @@ export default function StagnationAnalyticsChart({ data, totalOnSale }: Stagnati
               dataKey="count"
               fill="url(#stagnationBarGrad)"
               radius={[6, 6, 0, 0]}
-              maxBarSize={36}
+              maxBarSize={26}
               name="count"
             />
             <Line
@@ -174,7 +174,7 @@ export default function StagnationAnalyticsChart({ data, totalOnSale }: Stagnati
       <div className="rounded-lg bg-slate-50/80 px-3 py-2.5 border border-slate-100/80">
         <p className="text-[11px] leading-relaxed text-slate-600 text-center">
           <span className="font-medium text-slate-700">不良在庫</span>
-          ＝掲載から60日を超えた滞留。
+          ＝掲載から61日目以降の滞留（60日超）。帯は約2週間単位で細分化。
           <span className="text-slate-500">
             線グラフは、掲載有・在庫有{totalOnSale}台に対する各帯の割合です。
           </span>

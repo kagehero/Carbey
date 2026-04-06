@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
 import { ArrowUpDown, Search } from "lucide-react"
 import TablePagination from "@/components/ui/TablePagination"
+import { getCVRColor } from "@/lib/cvrPolicy"
 
 type VehicleRow = {
   id: string
@@ -40,15 +41,13 @@ function stagnationColor(days: number) {
   return "bg-green-50 text-green-700"
 }
 
-function cvrColor(cvr: number) {
-  if (cvr === 0) return "text-gray-400"
-  if (cvr < 1) return "text-red-600 font-bold"
-  if (cvr < 2) return "text-orange-600 font-semibold"
-  if (cvr >= 5) return "text-green-600 font-semibold"
-  return "text-blue-600"
-}
-
-export default function IntegratedAnalysisTable({ vehicles }: { vehicles: VehicleRow[] }) {
+export default function IntegratedAnalysisTable({
+  vehicles,
+  fleetAvgCvr,
+}: {
+  vehicles: VehicleRow[]
+  fleetAvgCvr: number
+}) {
   const [search, setSearch] = useState("")
   const [makerFilter, setMakerFilter] = useState("")
   const [stagnationFilter, setStagnationFilter] = useState<"" | "60" | "90" | "180">("") // min days
@@ -190,7 +189,7 @@ export default function IntegratedAnalysisTable({ vehicles }: { vehicles: Vehicl
                 {/* CVR */}
                 <td className="px-4 py-3 text-center">
                   {v.detail_views > 0 ? (
-                    <span className={`text-sm ${cvrColor(v.cvr)}`}>
+                    <span className={`text-sm ${getCVRColor(v.cvr, fleetAvgCvr)}`}>
                       {v.cvr.toFixed(2)}%
                     </span>
                   ) : (

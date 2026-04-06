@@ -13,6 +13,19 @@ import AIAnalysisForecast from '@/components/analytics/AIAnalysisForecast'
 import { Database } from '@/types/database'
 import { Timer } from 'lucide-react'
 import { isVisibleOnSale, isInStock } from '@/lib/inventoryMetrics'
+import { computeCvrDistribution, summarizeCvrFleetTiers } from '@/lib/cvrDistribution'
+import {
+  STAGNATION_DISTRIBUTION_BANDS,
+  BAD_INVENTORY_STAGNATION_BANDS,
+  buildPricingAnalyticsBands,
+} from '@/lib/dashboardAnalyticsBands'
+import {
+  computeFleetWeightedAvgCvr,
+  isCvrBelowFleetAvg,
+  isDashboardPriceReviewCandidate,
+  CVR_STATS_GOOD_MIN,
+  CVR_STATS_REVIEW_MIN,
+} from '@/lib/cvrPolicy'
 import PriceChangeTrendChart from '@/components/analytics/PriceChangeTrendChart'
 import type { InventoryForForecast } from '@/lib/aiForecast'
 
@@ -55,23 +68,21 @@ async function getDashboardStats() {
     ? Math.round(stagnationDays.reduce((a, b) => a + b, 0) / stagnationDays.length)
     : 0
 
-  // Calculate average CVR（掲載有・在庫有のみ）
-  const cvrs = visibleOnSaleVehicles
-    .filter(i => i.detail_views && i.detail_views > 0)
-    .map(i => calculateCVR(i.email_inquiries, i.detail_views))
-  const avgCVR = cvrs && cvrs.length > 0
-    ? (cvrs.reduce((a, b) => a + b, 0) / cvrs.length).toFixed(2)
-    : '0.00'
+  // 加重平均CVR（掲載有・在庫有・閲覧あり）
+  const avgCVR = computeFleetWeightedAvgCvr(visibleOnSaleVehicles).toFixed(2)
 
-  // 値下げ検討対象（掲載有・在庫有のみ、滞留60日以上 or CVR2%未満）
-  const discountCandidates = visibleOnSaleVehicles.filter(i => {
+  const onSaleVehicles = visibleOnSaleVehicles
+  const cvrFleetTiers = summarizeCvrFleetTiers(visibleOnSaleVehicles)
+  const lowCVR = cvrFleetTiers.poor
+
+  const discountCandidates = visibleOnSaleVehicles.filter((i) => {
     const days = calculateStagnationDays(i.published_date!)
     const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-    return days >= 60 || cvr < 2
+    const hasViews = (i.detail_views || 0) > 0
+    return isDashboardPriceReviewCandidate(days, cvr, cvrFleetTiers.fleetAvgCVR, hasViews)
   })
   const discountCount = discountCandidates.length
 
-  const onSaleVehicles = visibleOnSaleVehicles
   const stagnation180 = onSaleVehicles.filter(i => calculateStagnationDays(i.published_date!) >= 180).length
   const stagnation90 = onSaleVehicles.filter(i => {
     const d = calculateStagnationDays(i.published_date!)
@@ -81,26 +92,8 @@ async function getDashboardStats() {
     const d = calculateStagnationDays(i.published_date!)
     return d >= 60 && d < 90
   }).length
-  const lowCVR = onSaleVehicles.filter(i => {
-    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-    return i.detail_views && i.detail_views > 0 && cvr > 0 && cvr < 2
-  }).length
 
-  // Stagnation distribution
-  const stagnationBands = [
-    { label: '0-15日', min: 0, max: 15 },
-    { label: '16-30日', min: 16, max: 30 },
-    { label: '31-45日', min: 31, max: 45 },
-    { label: '46-60日', min: 46, max: 60 },
-    { label: '61-90日', min: 61, max: 90 },
-    { label: '91-120日', min: 91, max: 120 },
-    { label: '121-180日', min: 121, max: 180 },
-    { label: '181-240日', min: 181, max: 240 },
-    { label: '241-365日', min: 241, max: 365 },
-    { label: '366日超', min: 366, max: Infinity },
-  ]
-
-  const distribution = stagnationBands.map(band => {
+  const distribution = STAGNATION_DISTRIBUTION_BANDS.map((band) => {
     const count = typedInventories.filter(i => {
       if (!isVisibleOnSale(i) || !i.published_date) return false
       const days = calculateStagnationDays(i.published_date)
@@ -114,16 +107,7 @@ async function getDashboardStats() {
     }
   })
 
-  // Stagnation analytics: 不良在庫（60日以上）by band - bar: count, line: ratio
-  const badInventoryBands = [
-    { label: '61-90日', min: 61, max: 90 },
-    { label: '91-120日', min: 91, max: 120 },
-    { label: '121-180日', min: 121, max: 180 },
-    { label: '181-240日', min: 181, max: 240 },
-    { label: '241-365日', min: 241, max: 365 },
-    { label: '366日超', min: 366, max: Infinity },
-  ]
-  const stagnationAnalyticsData = badInventoryBands.map((band) => {
+  const stagnationAnalyticsData = BAD_INVENTORY_STAGNATION_BANDS.map((band) => {
     const count = onSaleVehicles.filter((i) => {
       const d = calculateStagnationDays(i.published_date!)
       return d >= band.min && d <= band.max
@@ -135,56 +119,9 @@ async function getDashboardStats() {
     }
   })
 
-  // CVR analytics: 要改善 vs 改善見込み vs 優秀（掲載有・在庫有のみ）
-  const cvrExcellent = visibleOnSaleVehicles.filter(
-    (i) => calculateCVR(i.email_inquiries, i.detail_views) >= 5
-  ).length
-  const cvrGood = visibleOnSaleVehicles.filter((i) => {
-    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-    return cvr >= 2 && cvr < 5
-  }).length
-  const cvrPoor = visibleOnSaleVehicles.filter((i) => {
-    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-    return cvr > 0 && cvr < 2
-  }).length
-  const cvrWithData = visibleOnSaleVehicles.filter(
-    (i) => i.detail_views && i.detail_views > 0
-  ).length
-  const cvrAnalyticsData = [
-    {
-      name: 'CVR分析',
-      要改善: cvrPoor,
-      改善見込み: cvrGood,
-      優秀: cvrExcellent,
-    },
-  ]
+  const cvrDistribution = computeCvrDistribution(visibleOnSaleVehicles)
 
-  // Pricing analytics: 値下げ対象 by urgency band
-  const pricingBands = [
-    { label: '緊急(180日超)', fn: (i: Inventory) => calculateStagnationDays(i.published_date!) >= 180 },
-    {
-      label: '要検討(90-179日)',
-      fn: (i: Inventory) => {
-        const d = calculateStagnationDays(i.published_date!)
-        return d >= 90 && d < 180
-      },
-    },
-    {
-      label: '注視(60-89日)',
-      fn: (i: Inventory) => {
-        const d = calculateStagnationDays(i.published_date!)
-        return d >= 60 && d < 90
-      },
-    },
-    {
-      label: 'CVR低のみ',
-      fn: (i: Inventory) => {
-        const d = calculateStagnationDays(i.published_date!)
-        const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-        return d < 60 && i.detail_views && i.detail_views > 0 && cvr > 0 && cvr < 2
-      },
-    },
-  ]
+  const pricingBands = buildPricingAnalyticsBands(cvrFleetTiers.fleetAvgCVR)
   const pricingAnalyticsData = pricingBands.map((band) => {
     const count = onSaleVehicles.filter((i) => band.fn(i)).length
     return {
@@ -258,15 +195,14 @@ async function getDashboardStats() {
     },
     distribution,
     stagnationAnalyticsData,
-    cvrAnalyticsData,
-    cvrWithData,
+    cvrDistribution,
+    cvrFleetTiers,
     pricingAnalyticsData,
     forecast,
     forecastInventorySnapshot,
     priceTrendData,
     priorityVehicles,
     discountCandidates,
-    inventories: typedInventories,
     alerts: { stagnation60, stagnation90, stagnation180, lowCVR, pricingCandidates: discountCount }
   }
 }
@@ -276,15 +212,14 @@ export default async function DashboardPage() {
     stats,
     distribution,
     stagnationAnalyticsData,
-    cvrAnalyticsData,
-    cvrWithData,
+    cvrDistribution,
+    cvrFleetTiers,
     pricingAnalyticsData,
     forecast,
     forecastInventorySnapshot,
     priceTrendData,
     priorityVehicles,
     discountCandidates,
-    inventories,
     alerts,
   } = await getDashboardStats()
 
@@ -306,7 +241,7 @@ export default async function DashboardPage() {
             <div className="min-w-0 flex-1">
               <h2 className="text-base font-semibold text-slate-800">滞留分析</h2>
               <p className="text-sm text-slate-500 mt-0.5 leading-snug">
-                60日超の滞留（不良在庫）を帯別に表示。棒＝台数、線＝全体に占める割合。
+                60日超（不良在庫）を約2週間単位など細かい帯に分割。棒＝台数、線＝販売中に占める割合。
               </p>
             </div>
           </div>
@@ -319,18 +254,18 @@ export default async function DashboardPage() {
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow px-6 pt-6 pb-3">
           <h2 className="text-base font-semibold text-slate-800 mb-1">CVR分析</h2>
           <p className="text-sm text-slate-500 mb-5">
-            要改善数値と改善見込み数値の対比
+            閲覧ありのCVRを0.1%刻みの帯に集計（データがある範囲を連続表示）。20%超は別枠（合計＝掲載有・在庫有）
           </p>
           <CVRAnalyticsChart
-            data={cvrAnalyticsData}
-            total={cvrWithData || stats.onSale}
+            rows={cvrDistribution.rows}
+            totalOnSale={cvrDistribution.total}
           />
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow px-6 pt-6 pb-3">
           <h2 className="text-base font-semibold text-slate-800 mb-1">価格最適化</h2>
           <p className="text-sm text-slate-500 mb-5">
-            値下げ対象台数（棒）と割合（線）
+            価格検討対象（閲覧あり・在庫加重平均CVR未満・滞留60日以上）のみを滞留日帯に分類。ドーナツ＝掲載在庫に占める台数割合（%）
           </p>
           <PricingAnalyticsChart
             data={pricingAnalyticsData}
@@ -359,7 +294,8 @@ export default async function DashboardPage() {
       {/* 滞留日数分布・CVR統計 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6">
-          <h2 className="text-base font-semibold text-slate-800 mb-5">滞留日数分布</h2>
+          <h2 className="text-base font-semibold text-slate-800 mb-1">滞留日数分布</h2>
+          <p className="text-xs text-slate-500 mb-4">掲載からの経過日数を細かい帯で表示（販売中のみ）</p>
           <StagnationChart data={distribution} />
         </div>
 
@@ -381,29 +317,29 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 pt-5 border-t border-slate-100">
-              <div className="rounded-lg bg-emerald-50/80 p-3">
-                <p className="text-xs text-slate-500 font-medium">優秀 (≥5%)</p>
-                <p className="text-xl font-bold text-emerald-600 mt-0.5 tabular-nums">
-                  {inventories.filter(i => calculateCVR(i.email_inquiries, i.detail_views) >= 5).length}
-                </p>
-              </div>
-              <div className="rounded-lg bg-sky-50/80 p-3">
-                <p className="text-xs text-slate-500 font-medium">良好 (2-5%)</p>
-                <p className="text-xl font-bold text-sky-600 mt-0.5 tabular-nums">
-                  {inventories.filter(i => {
-                    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-                    return cvr >= 2 && cvr < 5
-                  }).length}
-                </p>
-              </div>
-              <div className="rounded-lg bg-rose-50/80 p-3">
-                <p className="text-xs text-slate-500 font-medium">要改善 (&lt;2%)</p>
+            <p className="text-xs text-slate-500 mt-1 mb-3 leading-relaxed">
+              要改善＝在庫加重平均を下回る台。検討＝平均以上かつ{CVR_STATS_REVIEW_MIN}%〜
+              {CVR_STATS_GOOD_MIN}%未満。良好＝{CVR_STATS_GOOD_MIN}%以上（閲覧あり・排他）。
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 pt-2 border-t border-slate-100">
+              <div className="rounded-lg bg-rose-50/80 p-3 border border-rose-100/80">
+                <p className="text-xs text-slate-600 font-medium">要改善（平均未満）</p>
                 <p className="text-xl font-bold text-rose-600 mt-0.5 tabular-nums">
-                  {inventories.filter(i => {
-                    const cvr = calculateCVR(i.email_inquiries, i.detail_views)
-                    return cvr > 0 && cvr < 2
-                  }).length}
+                  {cvrFleetTiers.poor}
+                </p>
+              </div>
+              <div className="rounded-lg bg-amber-50/90 p-3 border border-amber-100/80">
+                <p className="text-xs text-slate-600 font-medium">
+                  検討（{CVR_STATS_REVIEW_MIN}〜{CVR_STATS_GOOD_MIN}%未満）
+                </p>
+                <p className="text-xl font-bold text-amber-700 mt-0.5 tabular-nums">
+                  {cvrFleetTiers.review}
+                </p>
+              </div>
+              <div className="rounded-lg bg-emerald-50/80 p-3 border border-emerald-100/80">
+                <p className="text-xs text-slate-500 font-medium">良好（{CVR_STATS_GOOD_MIN}%以上）</p>
+                <p className="text-xl font-bold text-emerald-600 mt-0.5 tabular-nums">
+                  {cvrFleetTiers.good}
                 </p>
               </div>
             </div>
@@ -419,7 +355,7 @@ export default async function DashboardPage() {
             滞留日数とCVRから算出した優先度の高い車両
           </p>
         </div>
-        <PriorityTable vehicles={priorityVehicles} />
+        <PriorityTable vehicles={priorityVehicles} fleetAvgCvr={cvrFleetTiers.fleetAvgCVR} />
       </div>
 
       {/* Discount Candidates */}
@@ -427,7 +363,7 @@ export default async function DashboardPage() {
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-base font-semibold text-slate-800">値下げ検討対象</h2>
           <p className="text-sm text-slate-500 mt-1">
-            滞留60日以上 または CVR 2%未満の車両
+            閲覧あり・在庫加重平均CVR未満・滞留60日以上
           </p>
         </div>
         <DiscountCandidates vehicles={discountCandidates} />

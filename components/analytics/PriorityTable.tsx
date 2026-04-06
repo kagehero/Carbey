@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { formatPrice, getStagnationColor, getCVRColor } from '@/lib/utils'
+import { formatPrice, getStagnationColor } from '@/lib/utils'
+import { getCVRColor } from '@/lib/cvrPolicy'
 import { ExternalLink } from 'lucide-react'
 import TablePagination from '@/components/ui/TablePagination'
 
@@ -18,9 +19,11 @@ interface Vehicle {
 
 interface PriorityTableProps {
   vehicles: Vehicle[]
+  /** 在庫加重平均CVR（%）。指定時は区分色が一致 */
+  fleetAvgCvr?: number
 }
 
-export default function PriorityTable({ vehicles }: PriorityTableProps) {
+export default function PriorityTable({ vehicles, fleetAvgCvr }: PriorityTableProps) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(24)
   useEffect(() => setPage(1), [pageSize, vehicles.length])
@@ -94,7 +97,7 @@ export default function PriorityTable({ vehicles }: PriorityTableProps) {
                 </span>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr)}`}>
+                <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr, fleetAvgCvr)}`}>
                   {vehicle.cvr.toFixed(2)}%
                 </span>
               </td>

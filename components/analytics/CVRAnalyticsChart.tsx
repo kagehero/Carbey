@@ -8,90 +8,80 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  Cell,
 } from 'recharts'
-
-interface DataPoint {
-  name: string
-  要改善: number
-  改善見込み: number
-  優秀?: number
-}
+import type { CvrBandRow } from '@/lib/cvrDistribution'
+import { CVR_HELP } from '@/lib/cvrDistribution'
 
 interface CVRAnalyticsChartProps {
-  data: DataPoint[]
-  total: number
+  rows: CvrBandRow[]
+  /** 掲載有・在庫有の合計（内訳の合計と一致） */
+  totalOnSale: number
 }
 
-const COLORS = {
-  要改善: '#f43f5e', // rose-500
-  改善見込み: '#0ea5e9', // sky-500
-  優秀: '#10b981', // emerald-500
-}
 const GRID_COLOR = '#f1f5f9'
 const AXIS_COLOR = '#64748b'
 
-export default function CVRAnalyticsChart({ data, total }: CVRAnalyticsChartProps) {
+export default function CVRAnalyticsChart({ rows, totalOnSale }: CVRAnalyticsChartProps) {
+  const chartData = rows.map((r) => ({ ...r, 台数: r.count }))
+  const sumBands = rows.reduce((s, r) => s + r.count, 0)
+
   return (
-    <div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data}
-          margin={{ top: 16, right: 20, left: 8, bottom: 16 }}
-          barCategoryGap="30%"
-          barGap={12}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
-          <XAxis
-            dataKey="name"
-            tick={{ fontSize: 11, fill: AXIS_COLOR }}
-            axisLine={{ stroke: AXIS_COLOR, strokeWidth: 1 }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: AXIS_COLOR }}
-            axisLine={false}
-            tickLine={false}
-            label={{ value: '台数', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: AXIS_COLOR } }}
-          />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: 'rgba(255,255,255,0.98)',
-              border: 'none',
-              borderRadius: '12px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-              padding: '12px 16px',
-            }}
-            formatter={(value: number, name: string) => [`${value}台`, name]}
-          />
-          <Legend wrapperStyle={{ paddingTop: '8px' }} iconType="circle" iconSize={8} />
-          <Bar
-            dataKey="要改善"
-            fill={COLORS.要改善}
-            radius={[6, 6, 0, 0]}
-            barSize={32}
-            name="要改善（CVR&lt;2%）"
-          />
-          <Bar
-            dataKey="改善見込み"
-            fill={COLORS.改善見込み}
-            radius={[6, 6, 0, 0]}
-            barSize={32}
-            name="改善見込み（CVR 2-5%）"
-          />
-          {data.some((d) => (d as DataPoint).優秀 != null) && (
-            <Bar
-              dataKey="優秀"
-              fill={COLORS.優秀}
-              radius={[6, 6, 0, 0]}
-              barSize={32}
-              name="優秀（CVR≥5%）"
+    <div className="space-y-3">
+      <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+        {CVR_HELP}
+      </p>
+      <div
+        className="w-full min-h-[280px]"
+        style={{ height: Math.min(640, 48 + chartData.length * 28) }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            layout="vertical"
+            data={chartData}
+            margin={{ top: 8, right: 24, left: 4, bottom: 8 }}
+            barCategoryGap="10%"
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+            <XAxis
+              type="number"
+              tick={{ fontSize: 11, fill: AXIS_COLOR }}
+              allowDecimals={false}
+              axisLine={{ stroke: '#cbd5e1' }}
             />
-          )}
-        </BarChart>
-      </ResponsiveContainer>
-      <p className="text-xs text-slate-500 mt-5 mb-1 text-center px-2">
-        要改善: CVR 2%未満 / 改善見込み: CVR 2-5% / 優秀: CVR 5%以上（全{total}台）
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={128}
+              tick={{ fontSize: 10, fill: AXIS_COLOR }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: 'rgba(255,255,255,0.98)',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                fontSize: '12px',
+              }}
+              formatter={(value: number) => [`${value}台`, '台数']}
+            />
+            <Bar dataKey="台数" radius={[0, 4, 4, 0]} barSize={12} name="台数">
+              {chartData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="text-xs text-slate-500 text-center px-1 leading-relaxed">
+        掲載有・在庫有 <span className="font-semibold text-slate-700">{totalOnSale}台</span>
+        ＝内訳合計 {sumBands}台
+        {sumBands === totalOnSale ? (
+          <span className="text-emerald-600">（一致）</span>
+        ) : (
+          <span className="text-amber-600">（要確認）</span>
+        )}
       </p>
     </div>
   )

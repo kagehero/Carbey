@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
-import { formatPrice, formatNumber, getCVRColor } from "@/lib/utils"
+import { formatPrice, formatNumber } from "@/lib/utils"
+import { getCVRColor } from "@/lib/cvrPolicy"
 import TablePagination from "@/components/ui/TablePagination"
 
 type Vehicle = {
@@ -19,9 +20,10 @@ type Vehicle = {
 type Props = {
   vehicles: Vehicle[]
   unitLabel?: string
+  fleetAvgCvr?: number
 }
 
-export default function CVRTableWithPagination({ vehicles, unitLabel = "台" }: Props) {
+export default function CVRTableWithPagination({ vehicles, unitLabel = "台", fleetAvgCvr }: Props) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(24)
   useEffect(() => setPage(1), [vehicles.length, pageSize])
@@ -71,7 +73,7 @@ export default function CVRTableWithPagination({ vehicles, unitLabel = "台" }: 
                   {formatNumber(vehicle.email_inquiries)}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr)}`}>
+                  <span className={`text-sm font-medium ${getCVRColor(vehicle.cvr, fleetAvgCvr)}`}>
                     {vehicle.cvr.toFixed(2)}%
                   </span>
                 </td>

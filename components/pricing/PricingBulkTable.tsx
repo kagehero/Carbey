@@ -37,6 +37,8 @@ type Props = {
   rows: PricingRow[]
   guardrails: Guardrails
   highlightVehicleId?: string
+  /** 在庫加重平均CVR（%）— 一覧行はいずれもこれ未満 */
+  fleetAvgCvr?: number
 }
 
 function clampSuggestedPrice(current: number, suggested: number, g: Guardrails, costPrice?: number | null) {
@@ -48,7 +50,7 @@ function clampSuggestedPrice(current: number, suggested: number, g: Guardrails, 
   return Math.max(suggested, floor)
 }
 
-export default function PricingBulkTable({ rows, guardrails, highlightVehicleId }: Props) {
+export default function PricingBulkTable({ rows, guardrails, highlightVehicleId, fleetAvgCvr }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [mode, setMode] = useState<PricingMode>("optimization")
   const [makerFilter, setMakerFilter] = useState<string>("all")
@@ -344,7 +346,9 @@ export default function PricingBulkTable({ rows, guardrails, highlightVehicleId 
               const clampedPrice = clampSuggestedPrice(r.currentPrice, s.suggested, guardrails, r.costPrice)
               const clamped = clampedPrice !== s.suggested
               const discountAmount = r.currentPrice - clampedPrice
-              const pct = r.currentPrice > 0 ? Math.round((discountAmount / r.currentPrice) * 100) : 0
+              const pctEff = r.currentPrice > 0 ? (discountAmount / r.currentPrice) * 100 : 0
+              const pctRounded = Math.round(pctEff * 10) / 10
+              const pctLabel = pctRounded % 1 === 0 ? `${pctRounded}` : pctRounded.toFixed(1)
               const cost = typeof r.costPrice === "number" && !Number.isNaN(r.costPrice) ? r.costPrice : null
               const marginNow = cost != null ? r.currentPrice - cost : null
               const marginAfter = cost != null ? clampedPrice - cost : null
@@ -399,7 +403,7 @@ export default function PricingBulkTable({ rows, guardrails, highlightVehicleId 
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-red-600">-{pct}%</div>
+                    <div className="text-sm font-medium text-red-600">-{pctLabel}%</div>
                     <div className="text-xs text-gray-500">-{formatPrice(discountAmount)}</div>
                     {clamped ? (
                       <div className="text-[11px] text-orange-600 mt-1">下限ガード適用</div>
@@ -415,7 +419,12 @@ export default function PricingBulkTable({ rows, guardrails, highlightVehicleId 
                     <span className="text-sm font-medium text-gray-900">{r.stagnation_days}日</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-medium text-gray-900">{r.cvr.toFixed(2)}%</span>
+                    <span className="text-sm font-medium text-red-700">{r.cvr.toFixed(2)}%</span>
+                    {typeof fleetAvgCvr === "number" ? (
+                      <div className="text-[11px] text-gray-500 mt-0.5">
+                        平均 {fleetAvgCvr.toFixed(2)}% · 差 −{(fleetAvgCvr - r.cvr).toFixed(2)}pt
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-xs text-gray-600">{s.reason}</span>
